@@ -1,0 +1,5 @@
+# One title-screen speech line per row. Keep exactly three lines, 17 characters
+# or fewer, using A-Z, spaces, apostrophes, and supported font punctuation.
+PLAY OR ELSE
+DON'T BE AN IDIOT
+YOU WON'T WIN
