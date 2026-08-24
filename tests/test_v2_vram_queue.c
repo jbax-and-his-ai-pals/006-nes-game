@@ -40,6 +40,12 @@ int main(void)
     check_eq("batch publish count", vram_queue_count, 2);
     check_eq("batch retains final byte", vram_queue_tile_data[1], 0x55);
 
+    vram_queue_clear();
+    check_eq("clear discards published queue work", vram_queue_count, 0);
+    check_eq("clear permits a fresh batch", vram_queue_batch_begin(), 1);
+    check_eq("clear leaves batch writable", vram_queue_batch_tile(1, 1, 8), 1);
+    check_eq("clear recovery batch commits", vram_queue_batch_commit(), 1);
+
     vram_queue_count = 1;
     for (i = 1; i < VRAM_QUEUE_CAPACITY; ++i) {
         (void)vram_queue_tile(0, i, i);

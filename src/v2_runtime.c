@@ -2,6 +2,11 @@
 
 #include "v2_runtime.h"
 
+#ifdef __NES__
+#pragma code-name ("FIXED_ENGINE")
+#pragma rodata-name ("FIXED_ENGINE_RODATA")
+#endif
+
 #define JOYPAD1 (*(unsigned char volatile *)0x4016)
 
 #pragma bss-name(push, "OAM")

@@ -1,3 +1,64 @@
 {
-  "assets": []
+  "assets": [
+    {
+      "kind": "prg",
+      "bank": 2,
+      "source": "assets/banks/casino_scene_data.bin"
+    },
+    {
+      "kind": "prg",
+      "banks": [3, 4],
+      "source": "build/scene_park_real.bin"
+    },
+    {
+      "kind": "prg",
+      "banks": [5, 6],
+      "source": "build/scene_avenue_real.bin"
+    },
+    {
+      "kind": "prg",
+      "banks": [7, 8],
+      "source": "build/scene_bar_real.bin"
+    },
+    {
+      "kind": "prg",
+      "banks": [9, 10],
+      "source": "build/scene_mart_real.bin"
+    },
+    {
+      "kind": "prg",
+      "banks": [11, 12],
+      "source": "build/scene_sewer_real.bin"
+    },
+    {
+      "kind": "prg",
+      "banks": [13, 14],
+      "source": "build/scene_casino_real.bin"
+    },
+    {
+      "kind": "prg",
+      "banks": [15, 16],
+      "source": "build/scene_zoo_real.bin"
+    },
+    {
+      "kind": "chr",
+      "bank": 2,
+      "source": "@common_chr"
+    },
+    {
+      "kind": "chr",
+      "bank": 3,
+      "source": "@common_chr"
+    },
+    {
+      "kind": "chr",
+      "bank": 4,
+      "source": "build/casino_cards_chr.bin"
+    },
+    {
+      "kind": "chr",
+      "bank": 5,
+      "source": "build/sewer_chr.bin"
+    }
+  ]
 }

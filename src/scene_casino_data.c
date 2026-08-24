@@ -1,9 +1,9 @@
-/* scene_casino_data.c -- data that belongs to Shady Ass Casino, not engine. */
+/* scene_casino_data.c -- data that belongs to Wrecked 'Em Casino, not engine. */
 #pragma rodata-name ("SCENE_CASINO_DATA")
 
 #include "scene_casino_data.h"
 
-const char casino_sign_text[] = "SHADY ASS CASINO";
+const char casino_sign_text[] = "WRECKED 'EM CASINO";
 const char casino_blackjack_text[] = "BLACKJACK";
 const char casino_exit_text[] = "EXIT";
 const char casino_slots_text[] = "SLOTS";

@@ -68,14 +68,18 @@ solutions.
 
 ### Phase 0.5: Cartridge Architecture
 
-- [x] Confirm the current cc65 `nes` target is fixed NROM: 32 KiB PRG-ROM
-  plus 8 KiB CHR-ROM, and keep the active build inside that limit.
+- [x] Confirm the active build is mapper-4 MMC3: 512 KiB PRG-ROM plus 256 KiB
+  CHR-ROM, with a 32 KiB CPU-visible runtime window awaiting scene banking.
 - [ ] Split the common runtime (startup, NMI, controller, OAM, text, and
   bank-switch trampolines) from scene-specific code and data.
 - [x] Add an MMC3 mapper-4 build target with 512 KiB PRG-ROM and 256 KiB
   CHR-ROM; keep the reset/vector bootstrap in the fixed bank.
-- [ ] Establish a common CHR bank for font, HUD, player, and title art, then
-  load scene-specific CHR banks on scene entry.
+- [x] Add a mapped-runtime budget guard and an active bank manifest; casino-owned
+  data now occupies PRG bank 2 and the Park module occupies banks 3-4; banks
+  5-61 remain available.
+- [x] Establish a common CHR bank for font, HUD, player, and title art, then
+  load scene-specific CHR banks on scene entry. Moonlight Park now selects
+  CHR bank 2, initially as a stable common-graphics clone.
 - [ ] Move each polished scene's art, dialogue, hotspots, and music data into
   named banks, with a small bank manifest and size budget report.
 
@@ -91,15 +95,24 @@ solutions.
 - [ ] Add a dialogue/action-result box that can render short paged text.
 - [ ] Replace combat input with inspect/take/use/talk dispatch.
 - [ ] Add deterministic game flags and a debug scene/item state display.
+- [x] Add fixed route/spawn state for scene transitions; see `ROUTING.md`.
+- [ ] Add a compact scene registry and data-driven exit routes before adding
+  more than two new destinations.
 
 ### Phase 2: Inventory and Puzzle Safety
 
-- [ ] Implement an inventory grid with item icons and descriptions.
+- [x] Implement a modal inventory list with selection and item descriptions;
+  it currently tracks the paper clip, Jimbles's beer, jukebox token, sewer
+  key, and temporary flamethrower pickup.
 - [ ] Support item-on-hotspot and item-on-item actions.
 - [ ] Add puzzle prerequisites, state transitions, and alternate hint text.
 - [ ] Ensure no puzzle-critical item can be consumed, sold, or discarded into
   an unwinnable state.
 - [ ] Write data-driven smoke tests for puzzle progression and failure paths.
+- [ ] Replace per-item state fields with an item catalog and ownership bitset
+  before the inventory grows beyond the current starter items.
+- [ ] Add reusable hotspot/action and event-result records before building the
+  first multi-scene puzzle.
 
 ### Phase 3: Vertical Slice
 
@@ -114,6 +127,10 @@ solutions.
 - [x] Build Neon Avenue, Jimbles's Bar, and All-Nite Mart as connected,
   playable scenes with authored collision, door transitions, and street
   traffic death traps.
+- [x] Expand the sewer into ladder shaft, flow junction, and dry-tunnel rooms;
+  the tunnel contains a persistent sewer key with no puzzle dependency yet.
+- [x] Turn Wrecked 'Em Casino into three working games sharing one credit
+  balance: slots, blackjack, and video poker.
 - [ ] Ship one three-step puzzle spanning all three scenes.
 - [ ] Add one conversation with a choice that changes flavor text or a clue,
   without branching the critical path.
@@ -123,8 +140,10 @@ solutions.
 ### Phase 4: The Night Town
 
 - [ ] Add Starlight Lodge & Lucky Wheel, Moonbeam Chapel, and The Comet Room.
-- [ ] Add Moonlight Park, Galaxy Lanes & Arcade, Slug Acres, Pocket Zoo, and
-  the Municipal Research Annex in the dependency order in `REBUILD_ROADMAP.md`.
+- [x] Add Moonlight Park as an eastward Neon Avenue destination, with a dry
+  fountain, paths, benches, and a distinct green night palette.
+- [ ] Add Galaxy Lanes & Arcade, Slug Acres, Pocket Zoo, and the Municipal
+  Research Annex in the dependency order in `REBUILD_ROADMAP.md`.
 - [ ] Give every destination one signature mechanic: observation, social
   exchange, ritual, performance, or inventory comedy.
 - [ ] Build a taxi/street transition map that reveals unlocked destinations.
@@ -148,11 +167,13 @@ solutions.
 
 ## Immediate Next Steps
 
-1. Build the inventory menu around the existing paper clip, jukebox token,
-   and beer state, then let one item solve a small recoverable puzzle.
-2. Extract the handwritten scene loops from `v2_title_main.c` into a reusable
-   scene/hotspot layer before adding a third full destination.
-3. Polish the sewer's walkable space and build Moonlight Park as the first
-   outward destination with its own visual identity and one simple puzzle.
-4. Expand the casino only after the interaction layer is reusable: blackjack
-   is still visual-only, while slots already provide the first minigame loop.
+1. Playtest the new sewer exits, casino controls, and park transition in Mesen;
+   tune collision halos and text only from observed behavior.
+2. Continue extracting the handwritten scene loops from
+   `src/v2_title_main.c` into the reusable scene/hotspot layer. Generic
+   tile/text/attribute writes, dialogue, input debounce, and inventory now
+   live in dedicated shared modules.
+3. Add a second public venue, preferably Galaxy Lanes & Arcade, with one
+   self-contained game and a non-critical collectible.
+4. Make the inventory visual rather than text-only by assigning icons from a
+   future scene-aware CHR bank, then design the first larger puzzle mechanic.

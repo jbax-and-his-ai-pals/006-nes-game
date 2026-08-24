@@ -18,6 +18,14 @@ call :run_test test_v2_vram_queue "src\v2_vram_queue.c tests\test_v2_vram_queue.
 call :run_test test_quest "src\rng.c src\quest.c tests\test_quest.c"
 call :run_test test_world "src\room.c src\world.c tests\test_world.c"
 
+echo --- test_pack_mmc3 ---
+python tests\test_pack_mmc3.py
+if errorlevel 1 (
+    echo   ^(exit code indicates failed checks^)
+    set FAILED=1
+)
+echo.
+
 echo.
 if %FAILED%==1 (
     echo ==== SOME TESTS FAILED ====

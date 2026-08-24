@@ -3,7 +3,7 @@
 An NES adventure-comedy rebuild in C for a 512 KiB PRG / 256 KiB CHR MMC3
 cartridge. The active game currently includes the animated title screen,
 Neon Avenue and All-Nite Mart exteriors, the sewer route, Jimbles's Bar and
-Piss Corner, All-Nite Mart's interior, and Shady Ass Casino.
+Piss Corner, All-Nite Mart's interior, and Wrecked 'Em Casino.
 
 The previous action-RPG prototype is archived for reference. It is not linked
 into the active ROM.

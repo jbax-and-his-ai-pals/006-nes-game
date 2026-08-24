@@ -9,7 +9,7 @@ than inherit the old 32 KiB runtime's layout and collision assumptions.
 ## Present Slice
 
 - Title presentation, portrait speech, mouth animation, and title music.
-- Common graphics in CHR bank 0 and a title-compatible CHR bank 1 selected
+- Common graphics in CHR bank 0 and a title-graphics clone in CHR bank 1 selected
   at title entry.
 - Fixed mapper boot in PRG bank 63 and the small active runtime packed into
   the initial MMC3 mapping.
@@ -97,7 +97,7 @@ specific characters, plot, dialogue, or puzzles from its inspirations.
 ## CHR Budget
 
 The 256-tile pattern-table window every current scene shares (see
-`MAPPER.md`) is fully allocated -- confirmed via `build/game_core.map`,
+`MAPPER.md`) is fully allocated -- confirmed via `build/game_runtime.map`,
 every one of the 256 tiles in CHR bank 0's first half is claimed by a
 linked `.s` file, none free. Everything built in this slice (bar collision
 zones, the casino's blackjack table, the taller patron, Jimbles's
@@ -116,10 +116,10 @@ Two known, not-yet-taken paths to more room, in increasing order of effort:
    `PPU.control`'s two independent pattern-table-select bits (currently
    both pinned to the low half at boot and never touched again). Roughly
    doubles the ceiling with no new banking work. Then extend
-   `mmc3_use_common_chr()`/`mmc3_use_title_chr()`'s pattern into a
-   parameterized per-scene bank select, using the CHR banks 2-31 already
-   reserved below and the manifest system already wired into
-   `pack_mmc3.py` (`assets/banks/manifest.json`, currently empty), so each
+   `mmc3_use_common_chr()`/`mmc3_use_title_chr()`/`mmc3_use_park_chr()`'s pattern into a
+   parameterized per-scene bank select, using the CHR banks 3-31 still
+   available below and the manifest system already wired into
+   `pack_mmc3.py` (`assets/banks/manifest.json`, with Park owning CHR 2), so each
    scene(-group) gets its own fresh 256+256 budget instead of competing
    for one shared pool. The open question here is the CHR-authoring
    pipeline for banked content -- the manifest expects a pre-built raw
@@ -144,7 +144,7 @@ the default assumption.
 2. Extend the rebuilt Neon Avenue scene with a fixed-bank scene ABI, a real
    bar-door transition, and the taxi death trap. **Door transition and taxi
    death trap done**; the fixed-bank scene ABI itself is not started -- all
-   three scenes still live in the one 32 KiB compatibility core.
+   three scenes still live in the one 32 KiB mapped runtime window.
 3. Rebuild Jimbles's Bar: bartender, jukebox, counter interactions, and
    casino door. **Done** for this slice's scope (see Present Slice above);
    no scene ABI yet, per step 1.
@@ -163,6 +163,43 @@ the default assumption.
    in the dependency order above.
 7. Expand the built Piss Corner with a reusable banished-patron state and a
    clue/shortcut that responds to dialogue and puzzle progression.
+
+## Scalability Systems
+
+The live cartridge now uses fixed PRG banks 62-63 for the engine and separate
+16 KiB PRG pairs for every current destination. New content should extend this
+model rather than grow the old transitional runtime image.
+
+1. **Scene registry and route table.** Expand the existing `V2SceneRoute`
+   state into compact data records that identify a scene's PRG pair, CHR bank,
+   default spawn, and music cue. Add exit-to-route records so a new doorway or
+   death response is data plus a scene-local exit code, not another nested
+   dispatcher branch.
+2. **Item catalog.** Replace one-field-per-item state with compact item IDs,
+   ownership bits, and read-only item metadata for names/descriptions/icons.
+   Keep puzzle-critical items non-consumable by default.
+3. **Hotspot/action records.** Give each scene small rectangle/action tables
+   for Look, Talk, Take, and Use. Scene code should own rendering and movement;
+   reusable fixed code should evaluate action prerequisites and apply results.
+4. **Event and death results.** Standardize item grants, dialogue, sounds,
+   flags, route changes, and comic deaths into a small result structure. Every
+   death should select an explicit respawn `V2SceneRoute`.
+5. **NPC profiles.** Move persistent dialogue progression and cross-scene NPC
+   state into profiles, while each scene retains its own movement/render loop.
+6. **Validation and diagnostics.** Extend the bank manifest with scene IDs,
+   PRG/CHR ownership, and dependency checks. Add host tests for routes, item
+   prerequisites, hotspot results, and checkpoint/death recovery. Add a
+   compile-time debug overlay only after its fixed-bank budget is reserved.
+
+### Capacity Rules
+
+- The fixed engine currently has roughly 4.5 KiB free. It is for mapper/NMI,
+  input, OAM/UI primitives, persistent state, shared rules, and the compact
+  registries above only.
+- Location-specific dialogue, NPC scripts, collision, art, music data, and
+  death presentation belong in that location's PRG pair and CHR page.
+- PRG pairs 15-61 and CHR banks 03-31 remain the expansion pool. Reserve a
+  pair and a CHR bank in the manifest before adding a new destination.
 
 ## Rules For New Scenes
 

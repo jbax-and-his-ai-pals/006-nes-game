@@ -1,5 +1,10 @@
 #include "v2_vram_queue.h"
 
+#ifdef __NES__
+#pragma code-name ("FIXED_ENGINE")
+#pragma rodata-name ("FIXED_ENGINE_RODATA")
+#endif
+
 volatile unsigned char vram_queue_count;
 unsigned char vram_queue_hi[VRAM_QUEUE_CAPACITY];
 unsigned char vram_queue_lo[VRAM_QUEUE_CAPACITY];
@@ -56,6 +61,15 @@ unsigned char vram_queue_batch_commit(void)
     vram_queue_count = vram_queue_batch_count;
     vram_queue_batch_active = 0;
     return 1;
+}
+
+void vram_queue_clear(void)
+{
+    /* Count is the NMI's publish flag. Clearing it first makes any stale
+     * partial or committed HUD update invisible on the next vblank. */
+    vram_queue_count = 0;
+    vram_queue_batch_count = 0;
+    vram_queue_batch_active = 0;
 }
 
 unsigned char vram_queue_tile(unsigned char row, unsigned char col,

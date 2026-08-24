@@ -3,8 +3,8 @@
 ## Authoritative Runtime
 
 The active game is the v2 rebuild, not the archived action-RPG prototype.
-`build.bat` links `src/v2_title_main.c`, `src/v2_runtime.c`, the shared
-assembly graphics/music sources, and the casino data module. `src/main.c`,
+`build.bat` builds the fixed engine plus each manifest-owned scene module,
+then packs them into the MMC3 cartridge. `src/main.c`,
 `movement.c`, `room.c`, and related systems remain useful historical
 reference and unit-test fixtures, but they do not ship in `game.nes`.
 
@@ -20,7 +20,10 @@ The playable flow is:
 5. Jimbles's Bar, including token, jukebox, bartender/patron dialogue, and
    the casino door, plus the Piss Corner's roaming banished patrons and
    evolving dialogue.
-6. Shady Ass Casino, including the slot interaction and walked exit.
+6. Wrecked 'Em Casino, including slots, blackjack, video poker, and a walked
+   exit.
+7. Moonlight Park, reached through Neon Avenue's eastern edge, with a dry
+   fountain, trees, wandering patrons, and its own active CHR page.
 
 ## Cartridge and Bank Baseline
 
@@ -29,11 +32,11 @@ and 256 KiB CHR. The reset stub in the fixed final PRG bank maps the current
 runtime into MMC3's initial CPU windows. CHR mapping is explicit rather than
 depending on mapper power-on state.
 
-This is **large-cartridge support**, not yet a banked-scene runtime. The
-linked executable still fits in one 32 KiB compatibility core, and
-`assets/banks/manifest.json` has no allocated scene payloads. This is an
-intentional, safe foundation: scenes can now grow into the cartridge without
-changing its file format, mapper, boot flow, or save-RAM layout.
+The live cartridge uses the fixed engine in PRG banks 62-63 and maps each
+location into `$8000-$BFFF` from its manifest-owned PRG pair. The current
+scene pairs are Park 03-04, Avenue 05-06, Bar 07-08, Mart 09-10, Sewer 11-12,
+and Casino 13-14. `V2GameState.route` records the active location and spawn;
+see `ROUTING.md` when adding exits, respawns, or destinations.
 
 ## Fixed-Core Responsibilities
 
@@ -58,18 +61,52 @@ content decision instead of allowing numeric wraparound.
 message/mouth updates. `src/mmc3.h` exposes only CHR mapping because C code
 must not remap the PRG window that contains its own return address.
 
+`src/v2_scene_ui.c` owns scroll reset plus generic tile, rectangle, attribute,
+and text writes. `src/v2_dialogue.c` owns the typed, three-line message overlay
+and its OAM clipping/NMI-queue protocol. Together these are the first extracted
+fixed-engine candidates; scene loops select palettes and redraw their own
+background after a message closes.
+
+`src/v2_input.c` owns held-button debouncing, while `src/v2_inventory.c` owns
+the inventory modal and descriptions. These services use only game state and
+the shared UI/runtime APIs, so they can move to the fixed engine without a
+scene-specific dependency.
+
+`src/v2_scene_casino.c` now owns the complete casino location loop, including
+slots, blackjack, poker, and its scene rendering. It currently links into the
+mapped runtime for behavioral stability, but its dependencies are limited to
+the extracted shared modules and casino state/data, making it the first PRG
+scene-pair candidate.
+
 ## Present Constraints
 
-- `v2_title_main.c` still owns scene logic and direct scene rendering. Split
-  it into shared scene helpers plus separate scene modules before adding many
-  destinations.
+- `v2_title_main.c` now owns only the title presentation and high-level scene
+  dispatch. Neon Avenue, Jimbles's Bar, Casino, Moonlight Park, All-Nite Mart,
+  and the sewer are source-isolated scene modules; their generic dependencies
+  live in shared fixed-engine candidates. The next requirement is the
+  fixed-bank dispatcher that makes those PRG pairs callable.
 - The NMI queue handles small tile changes and panel rows, but palette/fill
   commands and larger scene transitions still force blanking.
 - The visible 256-tile pattern-table half is full. Use the independent
   background/sprite pattern-table halves and then scene-specific CHR banks
   before adding substantial new art.
-- A true PRG-banked scene needs a fixed-bank trampoline and an ABI that never
-  lets banked C code select or return through a replaced PRG window.
+- A true PRG-banked scene entry and fixed-bank trampoline now build and pack;
+  the remaining task is routing the title/game dispatcher through them.
+- Startup/reset, NMI/title queue helpers, and music are explicitly assigned to
+  transitional `FIXED_ENGINE` linker segments. They still share the temporary
+  mapped window today, but are now ready to relocate together into fixed PRG
+  banks without leaving an NMI call into switchable code.
+- `mmc3_select_prg_pair()` now lives in that fixed segment and maps a
+  contiguous scene pair into `$8000-$BFFF`. The next implementation step is
+  the fixed trampoline described in `BANKED_DISPATCHER.md`.
+- `build_fixed_engine.bat` proves the fixed engine links at its final
+  `$C000-$FFFF` address range with a separate link-only scene-stub target.
+- `build_fixed_layout.bat` proves that the fixed engine packs into PRG banks
+  62-63 alongside Park's real executable pair at PRG 3-4.
+- The current mapped-runtime guard reports 181 bytes free. The extraction work
+  improves the eventual split but does not create room for new in-window
+  features; avoid adding large functionality before the first PRG scene pair
+  is callable.
 
 ## Near-Term Order
 
@@ -78,5 +115,5 @@ must not remap the PRG window that contains its own return address.
    transitions and Mart interaction/collision bounds.
 3. Extend the NMI queue with palette/fill commands for richer UI and smoother
    scene transitions.
-4. Introduce fixed-bank PRG trampolines, then assign an explicit PRG/CHR
-   budget to the first banked destination in the manifest.
+4. Route Moonlight Park through the fixed-bank trampoline, then apply the
+   same module build contract to Neon Avenue and the Bar.

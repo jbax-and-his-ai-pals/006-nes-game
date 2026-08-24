@@ -8,7 +8,11 @@
 
         .export         _exit
         .export         __STARTUP__ : absolute = 1
-        .export         _mmc3_use_common_chr, _mmc3_use_title_chr
+        .export         _mmc3_use_common_chr, _mmc3_use_title_chr, _mmc3_use_park_chr
+        .export         _mmc3_use_casino_cards_chr, _mmc3_use_sewer_chr
+        .export         _mmc3_select_prg_pair
+        .export         _mmc3_call_mapped_scene
+        .export         _banked_scene_arg
 
         .import         initlib, donelib, callmain
         .import         zerobss, copydata
@@ -31,62 +35,93 @@
         .byte   %00000000
         .byte   0,0,0,0,0,0,0,0
 
-.segment "STARTUP"
+.segment "FIXED_ENGINE"
 ; These routines only alter PPU pattern-table mapping. Unlike PRG bank
 ; changes, they cannot unmap the C caller, so scene entry may call them
 ; directly while the fixed-engine PRG trampoline work is still underway.
 _mmc3_use_common_chr:
         lda     #$00
+        jmp     mmc3_map_chr
+
+_mmc3_use_title_chr:
+        lda     #$08
+        jmp     mmc3_map_chr
+
+_mmc3_use_park_chr:
+        lda     #$10
+        jmp     mmc3_map_chr
+
+; CHR bank 4 -- font.s + box_border.s + casino_cards.s (see
+; build_casino_cards_chr.bat and casino_cards.s), a genuinely new tile set
+; for the blackjack/poker card screens rather than a reuse of the shared
+; common bank's already-spent 256-tile budget.
+_mmc3_use_casino_cards_chr:
+        lda     #$20
+        jmp     mmc3_map_chr
+
+_mmc3_use_sewer_chr:
+        lda     #$28
+        jmp     mmc3_map_chr
+
+; Map one contiguous 8 KiB CHR page. Registers 0 and 1 select 2 KiB each;
+; registers 2 through 5 select the remaining four 1 KiB regions.
+mmc3_map_chr:
+        tax
+        lda     #$00
         sta     $8000
-        sta     $8001
+        stx     $8001
+        inx
+        inx
         lda     #$01
         sta     $8000
-        lda     #$02
-        sta     $8001
+        stx     $8001
+        inx
+        inx
         lda     #$02
         sta     $8000
-        lda     #$04
-        sta     $8001
+        stx     $8001
+        inx
         lda     #$03
         sta     $8000
-        lda     #$05
-        sta     $8001
+        stx     $8001
+        inx
         lda     #$04
         sta     $8000
-        lda     #$06
-        sta     $8001
+        stx     $8001
+        inx
         lda     #$05
         sta     $8000
-        lda     #$07
+        stx     $8001
+        rts
+
+; C fastcall ABI passes the first bank number in A. This routine lives in the
+; fixed engine, so callers may safely replace both switchable CPU windows.
+; Scene code must never call it directly because it would unmap its own return
+; address before RTS; the fixed dispatcher will own that transition.
+_mmc3_select_prg_pair:
+        tax
+        lda     #$06                ; register 6 maps $8000-$9FFF
+        sta     $8000
+        txa
+        sta     $8001
+        inx
+        lda     #$07                ; register 7 maps $A000-$BFFF
+        sta     $8000
+        txa
         sta     $8001
         rts
 
-_mmc3_use_title_chr:
-        lda     #$00
-        sta     $8000
-        lda     #$08
-        sta     $8001
-        lda     #$01
-        sta     $8000
-        lda     #$0A
-        sta     $8001
-        lda     #$02
-        sta     $8000
-        lda     #$0C
-        sta     $8001
-        lda     #$03
-        sta     $8000
-        lda     #$0D
-        sta     $8001
-        lda     #$04
-        sta     $8000
-        lda     #$0E
-        sta     $8001
-        lda     #$05
-        sta     $8000
-        lda     #$0F
-        sta     $8001
+; The caller and this return address are fixed at $C000-$FFFF. The selected
+; scene may therefore return normally without relying on a switchable bank.
+_mmc3_call_mapped_scene:
+        jsr     $8000
         rts
+
+.segment "BSS"
+_banked_scene_arg:
+        .res    1
+
+.segment "FIXED_ENGINE"
 
 start:
         sei
@@ -139,7 +174,7 @@ mmc3_boot:
         sta     $8001
         jmp     start
 
-.segment "STARTUP"
+.segment "FIXED_ENGINE"
 
 ; The NMI owns only timing and APU writes. Room/title rendering uses direct
 ; PPU register writes while forced blank, so touching PPU registers here

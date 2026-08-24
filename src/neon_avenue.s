@@ -59,8 +59,17 @@
 ; left / fill / right
 .byte $C0, $C0, $C0, $C0, $C0, $C0, $C0, $C0
 .byte $3F, $3F, $3F, $3F, $3F, $3F, $3F, $3F
-.byte $00, $00, $00, $00, $00, $00, $00, $00
-.byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+; This used to be the plate's "fill" tile -- solid index 2 throughout
+; (plane0 all $00, plane1 all $FF), byte-for-byte identical to font.s's
+; own blank glyph (tile 8, FONT_TILE_BASE), since both are just "solid
+; index 2." draw_storefront_sign() now fills with FONT_TILE_BASE instead
+; (see v2_scene_ui.c), freeing this slot for the blackjack table's
+; bottom-right corner (see taxi.s's top-left corner for the shared design
+; notes -- full rail band on both the bottom 2 rows and right 2 columns;
+; this is the point-mirror of that one, matching bar_interior.s's
+; bottom-left).
+.byte $03, $03, $03, $03, $03, $02, $FC, $F0
+.byte $FC, $FC, $FC, $FC, $FC, $FC, $00, $00
 .byte $03, $03, $03, $03, $03, $03, $03, $03
 .byte $FC, $FC, $FC, $FC, $FC, $FC, $FC, $FC
 ; bottom-left / bottom / bottom-right

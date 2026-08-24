@@ -1,5 +1,10 @@
 #include "rng.h"
 
+#ifdef __NES__
+#pragma code-name ("FIXED_ENGINE")
+#pragma rodata-name ("FIXED_ENGINE_RODATA")
+#endif
+
 /* 0xB8 (binary 10111000) is a maximal-length tap set for an 8-bit
  * Galois LFSR -- every non-zero starting state visits all 255 non-zero
  * values before repeating. */

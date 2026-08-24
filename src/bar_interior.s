@@ -34,9 +34,14 @@
 .byte $FF, $81, $BD, $A5, $A5, $BD, $81, $FF
 .byte $00, $00, $18, $3C, $3C, $18, $00, $00
 
-; back-room left plank: same continuous wood, separated by black seams
-.byte $7E, $7E, $7E, $7E, $7E, $7E, $7E, $7E
-.byte $00, $00, $00, $00, $00, $00, $00, $00
+; This used to be a second "back-room plank" tile, byte-for-byte identical
+; to BAR_TILE_PLANK_R above -- v2_scene_bar.c now draws both plank
+; positions with that one tile (see BAR_TILE_PLANK_L there), freeing this
+; slot for the blackjack table's bottom-left corner (see taxi.s's top-left
+; corner for the shared design notes -- full rail band on both the bottom
+; 2 rows and left 2 columns; this is its vertical mirror).
+.byte $C0, $C0, $C0, $C0, $C0, $40, $3F, $0F
+.byte $3F, $3F, $3F, $3F, $3F, $3F, $00, $00
 
 ; Compact bar stool: a warm wooden seat on narrow dark legs. Two instances
 ; beside the seated regular make the counter read as a place to sit.

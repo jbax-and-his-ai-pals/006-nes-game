@@ -1,5 +1,10 @@
 #include "font.h"
 
+#ifdef __NES__
+#pragma code-name ("FIXED_ENGINE")
+#pragma rodata-name ("FIXED_ENGINE_RODATA")
+#endif
+
 unsigned char font_glyph_index(char c)
 {
     if (c >= 'a' && c <= 'z') {

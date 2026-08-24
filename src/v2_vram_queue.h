@@ -25,4 +25,8 @@ unsigned char vram_queue_batch_tile(unsigned char row, unsigned char col,
 unsigned char vram_queue_batch_address(unsigned int address, unsigned char value);
 unsigned char vram_queue_batch_commit(void);
 
+/* A full-screen renderer owns the nametable and must discard any deferred
+ * scene HUD writes before it starts direct PPU work. */
+void vram_queue_clear(void);
+
 #endif
