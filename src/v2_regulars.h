@@ -6,6 +6,8 @@ void reset_piss_corner_regulars(void);
 void update_piss_corner_regulars(void);
 void reset_park_regulars(void);
 void update_park_regulars(void);
+unsigned char park_regular_is_near(unsigned char regular, unsigned char x,
+                                   unsigned char y);
 void draw_regulars(void);
 void draw_bar_patron(void);
 

@@ -21,6 +21,18 @@
 #define MSG_BOX_RIGHT ((MSG_BOX_LEFT + MSG_BOX_WIDTH) * 8)
 #define MSG_BOX_BOTTOM ((MSG_BOX_TOP + MSG_BOX_HEIGHT) * 8)
 
+static unsigned char message_palette = 3;
+
+void dialogue_set_palette(unsigned char palette)
+{
+    message_palette = palette & 3;
+}
+
+unsigned char dialogue_get_palette(void)
+{
+    return message_palette;
+}
+
 static void hide_sprites_under_message_box(void)
 {
     unsigned char i;
@@ -59,7 +71,8 @@ static void queue_message_panel_row(unsigned char row)
         unsigned char attr_row = (unsigned char)(row >> 2);
         for (col = 1; col < 7; ++col) {
             (void)vram_queue_batch_address((unsigned int)0x23C0 +
-                                            (unsigned int)attr_row * 8 + col, 0x55);
+                                            (unsigned int)attr_row * 8 + col,
+                                            (unsigned char)(message_palette * 0x55));
         }
     }
     (void)vram_queue_batch_commit();
@@ -78,7 +91,7 @@ void show_message_box(const char *line1, const char *line2, const char *line3)
      * dismissal restore their own palette assignments. */
     PPU.mask = 0;
     PPU.vram.address = 0x3F;
-    PPU.vram.address = 0x04;
+    PPU.vram.address = (unsigned char)(message_palette << 2);
     PPU.vram.data = 0x0F;
     PPU.vram.data = 0x2A;
     PPU.vram.data = 0x01;

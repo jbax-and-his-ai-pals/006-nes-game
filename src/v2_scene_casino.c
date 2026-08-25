@@ -53,8 +53,7 @@
  * forward-declared so show_slots_screen() can call it despite coming
  * first in the file. */
 static void show_casino_game_screen(const char *title);
-/* Defined below (shared payout-table row renderer, originally built for
- * poker); forward-declared so draw_slots_payout_table() can reuse it. */
+/* Defined below (shared payout-table row renderer for poker). */
 static void draw_payout_row(unsigned char row, const char *name, unsigned char multiplier);
 /* Centers whichever symbol is showing within a slot window's 7-tile
  * interior (see SLOTS_WINDOW_SPACING). SEVEN and CHERRY are single
@@ -186,66 +185,19 @@ static void draw_casino_hud(void)
     draw_slot_symbol(SLOTS_SYMBOL_ROW, (unsigned char)(2 * SLOTS_WINDOW_SPACING), casino_reel[2]);
 }
 
-/* Multipliers here are written out matching casino_payout()'s own table
- * (see v2_casino.c) exactly -- same by-hand-sync discipline as
- * draw_poker_payout_table(), no shared source of truth between game logic
- * and this display. Symbol names come from casino_slot_symbols[] itself
- * rather than being retyped, so at least those two can't drift apart. */
-static void draw_slots_payout_table(void)
-{
-    static const unsigned char multiplier[CASINO_SYMBOL_COUNT] = {10, 7, 5};
-    unsigned char i;
-
-    for (i = 0; i < CASINO_SYMBOL_COUNT; ++i) {
-        draw_payout_row((unsigned char)(SLOTS_PAYOUT_TABLE_TOP + i), casino_slot_symbols[i], multiplier[i]);
-    }
-    /* BAR is wild (see casino_is_winner() in v2_casino.c) -- it stands in
-     * for whichever other symbol the remaining reels show, so e.g. 7-7-
-     * BAR still wins at 7's rate. Spelled out here since nothing else on
-     * screen would tell the player a mismatched pull can still be a win. */
-    draw_text((unsigned char)(SLOTS_PAYOUT_TABLE_TOP + CASINO_SYMBOL_COUNT), 2, "BAR IS WILD -- MATCHES ANY");
-}
-
-static unsigned char text_width(const char *text)
-{
-    unsigned char len = 0;
-    while (text[len]) ++len;
-    return len;
-}
-
-/* The result of the most recent pull -- spells out all three reels plus
- * the outcome ("7 7 BAR -- WIN +10") instead of the old "3X 7! +10",
- * which didn't say what actually lined up and read as unclear once BAR's
- * wild substitution meant a win no longer has to be three matching
- * symbols. Worst case ("CHERRY CHERRY CHERRY -- WIN +NNN", the longest
- * name three times over) is exactly 31 characters -- fits an unbroken row
- * starting at column 0 with one column to spare.
- *
- * Unlike the reel/credits/bet HUD, this doesn't go through the NMI queue:
- * it only changes once per pull (when the spin settles, see
- * run_slots_game()), not continuously during one, and adding a message
- * this long to the same queued batch that already updates the reels/
- * credits/bet/lever would overflow the queue's fixed 32-entry capacity
- * (that batch alone is already 16). A one-shot forced-blank write, the
- * same as every other non-continuous update in this file, is simpler and
- * safe regardless of how long it takes. */
+/* The reels themselves show the resolved symbols, so this one-shot line
+ * only needs to report whether that completed pull won. Keeping it short
+ * leaves the casino bank room for the roulette board. */
 static void show_slots_result(void)
 {
     unsigned char payout = casino_payout(&game_state.casino);
-    unsigned char col = 0;
-    unsigned char i;
 
     PPU.mask = 0;
     fill_title_rect(SLOTS_RESULT_ROW, 0, 32, 1, FONT_TILE_BASE);
-    for (i = 0; i < CASINO_REEL_COUNT; ++i) {
-        draw_text(SLOTS_RESULT_ROW, col, casino_slot_symbols[casino_reel[i]]);
-        col = (unsigned char)(col + text_width(casino_slot_symbols[casino_reel[i]]) + 1);
-    }
     if (payout) {
-        draw_text(SLOTS_RESULT_ROW, col, "-- WIN +");
-        draw_digits3(SLOTS_RESULT_ROW, (unsigned char)(col + 8), payout);
+        draw_text(SLOTS_RESULT_ROW, 10, "WIN");
     } else {
-        draw_text(SLOTS_RESULT_ROW, col, "-- NO WIN");
+        draw_text(SLOTS_RESULT_ROW, 9, "NO WIN");
     }
     reset_scroll();
     PPU.mask = 0x1E;
@@ -324,8 +276,8 @@ static void show_casino(void)
          * own two attribute cells, not the floor. */
         0x07, 0x17, 0x08, 0x28, 0x0F, 0x07, 0x1A, 0x30,
         0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F,
-        0x07, 0x0F, 0x0F, 0x0F, 0x0F, 0x16, 0x27, 0x30,
-        0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F
+        0x07, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x27, 0x30,
+        0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x30
     };
     unsigned char i;
 
@@ -397,6 +349,12 @@ static void show_casino(void)
      * table it names. */
     draw_text(7, 21, casino_blackjack_text);
 
+    /* Roulette gets the quieter lower half of the room: a broad felt table
+     * beneath the machines, leaving a clear aisle around all four games. */
+    set_tile(18, 11, 230); fill_title_rect(18, 12, 8, 1, 201); set_tile(18, 20, 231);
+    set_tile(19, 11, 242); fill_title_rect(19, 12, 8, 1, 204); set_tile(19, 20, 204);
+    set_tile(20, 11, 242); fill_title_rect(20, 12, 8, 1, 207); set_tile(20, 20, 207);
+
     for (i = 0; i < 8; ++i) set_attribute_block(0, i, 0);
     for (i = 0; i < 8; ++i) set_attribute_block(1, i, 0);
     for (i = 0; i < 8; ++i) set_attribute_block(2, i, 0);
@@ -412,6 +370,10 @@ static void show_casino(void)
      * doesn't need to share this palette at all. */
     set_attribute_block(2, 5, 1);
     set_attribute_block(2, 6, 1);
+    set_attribute_block(4, 2, 1);
+    set_attribute_block(4, 3, 1);
+    set_attribute_block(4, 4, 1);
+    set_attribute_block(4, 5, 1);
 
     /* The reel/credits/bet HUD and its control hints deliberately aren't
      * drawn here -- the slot machine is its own full-screen game now (see
@@ -438,7 +400,6 @@ static void show_casino(void)
 static void show_slots_screen(void)
 {
     show_casino_game_screen("SLOTS");
-    draw_slots_payout_table();
     draw_slots_windows();
     draw_slots_lever(0);
     draw_casino_hud();
@@ -1018,12 +979,214 @@ static void run_slots_game(void)
     }
 }
 
+/* A proper American layout: two green pockets and a three-column board for
+ * 1-36. The same standard wheel order used by v2_casino.c drives the ball,
+ * so the animated marker always stops on the resolved pocket rather than a
+ * merely decorative loop. */
+static void roulette_pocket_text(char *text, unsigned char pocket)
+{
+    if (pocket == CASINO_ROULETTE_DOUBLE_ZERO) {
+        text[0] = '0'; text[1] = '0'; text[2] = 0;
+    } else if (pocket >= 10) {
+        text[0] = (char)('0' + pocket / 10);
+        text[1] = (char)('0' + pocket % 10);
+        text[2] = 0;
+    } else {
+        text[0] = (char)('0' + pocket); text[1] = 0;
+    }
+}
+
+/* The marker lives in the blank first tile of each pocket cell, leaving the
+ * numeric label and its red/black suit icon untouched throughout a spin. */
+static void roulette_pocket_position(unsigned char pocket, unsigned char *row, unsigned char *col)
+{
+    if (pocket == CASINO_ROULETTE_ZERO) {
+        *row = 8; *col = 7;
+    } else if (pocket == CASINO_ROULETTE_DOUBLE_ZERO) {
+        *row = 8; *col = 16;
+    } else if (pocket == CASINO_ROULETTE_RED) {
+        *row = 21; *col = 7;
+    } else if (pocket == CASINO_ROULETTE_BLACK) {
+        *row = 21; *col = 17;
+    } else {
+        pocket = (unsigned char)(pocket - 1);
+        *row = (unsigned char)(9 + pocket / 3);
+        *col = (unsigned char)(5 + (pocket % 3) * 9);
+    }
+}
+
+static void draw_roulette_pocket(unsigned char row, unsigned char col, unsigned char pocket)
+{
+    char text[3];
+    unsigned char icon;
+
+    fill_title_rect(row, col, 8, 1, FONT_TILE_BASE);
+    roulette_pocket_text(text, pocket);
+    draw_text(row, (unsigned char)(col + 1), text);
+    if (pocket == CASINO_ROULETTE_ZERO || pocket == CASINO_ROULETTE_DOUBLE_ZERO) icon = CARD_SUIT_CLUB;
+    else icon = (pocket & 1) ? CARD_SUIT_HEART : CARD_SUIT_SPADE;
+    set_tile(row, (unsigned char)(col + 5), icon);
+}
+
+static void draw_roulette_board(unsigned char marker)
+{
+    unsigned char row, col, pocket;
+    unsigned char marker_row, marker_col;
+
+    draw_roulette_pocket(8, 7, CASINO_ROULETTE_ZERO);
+    draw_roulette_pocket(8, 16, CASINO_ROULETTE_DOUBLE_ZERO);
+    for (row = 0; row < 12; ++row) {
+        for (col = 0; col < 3; ++col) {
+            pocket = (unsigned char)(row * 3 + col + 1);
+            draw_roulette_pocket((unsigned char)(row + 9), (unsigned char)(5 + col * 9), pocket);
+        }
+    }
+    draw_text(21, 8, "RED");
+    set_tile(21, 12, CARD_SUIT_HEART);
+    draw_text(21, 18, "BLACK");
+    set_tile(21, 24, CARD_SUIT_SPADE);
+    roulette_pocket_position(marker, &marker_row, &marker_col);
+    set_tile(marker_row, marker_col, CARD_SUIT_DIAMOND);
+}
+
+static void show_roulette_screen(unsigned char marker)
+{
+    char text[3];
+
+    show_casino_game_screen("ROULETTE");
+    draw_roulette_board(marker);
+    draw_text(25, 4, "SELECT BET");
+    if (game_state.casino.roulette_state == CASINO_GAME_RESOLVED) {
+        draw_text(23, 7, "RESULT");
+        roulette_pocket_text(text, game_state.casino.roulette_result);
+        draw_text(23, 15, text);
+    }
+    reset_scroll();
+    PPU.mask = 0x1E;
+}
+
+static void queue_roulette_marker(unsigned char old_pocket, unsigned char new_pocket)
+{
+    unsigned char old_row, old_col, new_row, new_col;
+    roulette_pocket_position(old_pocket, &old_row, &old_col);
+    roulette_pocket_position(new_pocket, &new_row, &new_col);
+    (void)vram_queue_tile(old_row, old_col, FONT_TILE_BASE);
+    (void)vram_queue_tile(new_row, new_col, CARD_SUIT_DIAMOND);
+}
+
+static unsigned char roulette_move(unsigned char pocket, unsigned char direction)
+{
+    unsigned char row, col;
+
+    if (pocket == CASINO_ROULETTE_ZERO) {
+        if (direction == PAD_RIGHT) return CASINO_ROULETTE_DOUBLE_ZERO;
+        if (direction == PAD_DOWN) return 1;
+        return pocket;
+    }
+    if (pocket == CASINO_ROULETTE_DOUBLE_ZERO) {
+        if (direction == PAD_LEFT) return CASINO_ROULETTE_ZERO;
+        if (direction == PAD_DOWN) return 2;
+        return pocket;
+    }
+    if (pocket == CASINO_ROULETTE_RED) {
+        if (direction == PAD_RIGHT) return CASINO_ROULETTE_BLACK;
+        if (direction == PAD_UP) return 34;
+        return pocket;
+    }
+    if (pocket == CASINO_ROULETTE_BLACK) {
+        if (direction == PAD_LEFT) return CASINO_ROULETTE_RED;
+        if (direction == PAD_UP) return 36;
+        return pocket;
+    }
+    pocket = (unsigned char)(pocket - 1);
+    row = (unsigned char)(pocket / 3);
+    col = (unsigned char)(pocket % 3);
+    if (direction == PAD_UP) return row ? (unsigned char)(pocket - 2) : (col ? CASINO_ROULETTE_DOUBLE_ZERO : CASINO_ROULETTE_ZERO);
+    if (direction == PAD_DOWN) {
+        if (row < 11) return (unsigned char)(pocket + 4);
+        return col < 2 ? CASINO_ROULETTE_RED : CASINO_ROULETTE_BLACK;
+    }
+    if (direction == PAD_LEFT) return col ? pocket : (unsigned char)(pocket + 3);
+    return col < 2 ? (unsigned char)(pocket + 2) : (unsigned char)(pocket - 1);
+}
+
+static unsigned char roulette_wheel_index(unsigned char pocket)
+{
+    unsigned char i;
+    for (i = 0; i < CASINO_ROULETTE_POCKET_COUNT; ++i) {
+        if (casino_roulette_wheel[i] == pocket) return i;
+    }
+    return 0;
+}
+
+static void run_roulette_game(void)
+{
+    unsigned char pad;
+    unsigned char pick = game_state.casino.roulette_pick;
+    unsigned char ball = pick;
+    unsigned char wheel_index;
+    unsigned char spin_tick = 0;
+    unsigned char spin_steps = 0;
+    unsigned char target_steps = 0;
+    unsigned char spinning = 0;
+    unsigned char a_held = 1, a_run = 0;
+    unsigned char b_held = 0, b_run = 0;
+    unsigned char direction_held = 0;
+    unsigned char select_held = 0, select_run = 0;
+
+    if (pick >= CASINO_ROULETTE_BET_COUNT) pick = 1;
+    show_roulette_screen(game_state.casino.roulette_state == CASINO_GAME_RESOLVED ? game_state.casino.roulette_result : pick);
+    for (;;) {
+        waitvsync();
+        reset_scroll();
+        oam_flush();
+        pad = read_pad();
+
+        if (spinning) {
+            if (++spin_tick == 2) {
+                unsigned char old_ball = ball;
+                spin_tick = 0;
+                wheel_index = (unsigned char)((wheel_index + 1) % CASINO_ROULETTE_POCKET_COUNT);
+                ball = casino_roulette_wheel[wheel_index];
+                queue_roulette_marker(old_ball, ball);
+                if (++spin_steps == target_steps) {
+                    spinning = 0;
+                    show_roulette_screen(game_state.casino.roulette_result);
+                }
+            }
+            continue;
+        }
+
+        if (debounce_press((unsigned char)(pad & PAD_B), &b_held, &b_run)) return;
+        if ((pad & (PAD_UP | PAD_DOWN | PAD_LEFT | PAD_RIGHT)) && !direction_held) {
+            unsigned char old_pick = pick;
+            pick = roulette_move(pick, (unsigned char)(pad & (PAD_UP | PAD_DOWN | PAD_LEFT | PAD_RIGHT)));
+            if (pick != old_pick) queue_roulette_marker(old_pick, pick);
+        }
+        direction_held = (unsigned char)(pad & (PAD_UP | PAD_DOWN | PAD_LEFT | PAD_RIGHT));
+        if (debounce_press((unsigned char)(pad & PAD_SELECT), &select_held, &select_run)) {
+            casino_bet = casino_bet == 10 ? 1 : (unsigned char)(casino_bet + 1);
+            queue_digits2(5, 23, casino_bet);
+        }
+        if (debounce_press((unsigned char)(pad & PAD_A), &a_held, &a_run) && casino_credits >= casino_bet) {
+            casino_roulette_spin(&game_state.casino, pick);
+            ball = pick < CASINO_ROULETTE_POCKET_COUNT ? pick : CASINO_ROULETTE_ZERO;
+            wheel_index = roulette_wheel_index(ball);
+            spin_tick = 0;
+            spin_steps = 0;
+            target_steps = (unsigned char)(76 + roulette_wheel_index(game_state.casino.roulette_result) - wheel_index);
+            spinning = 1;
+        }
+    }
+}
+
 /* Fixtures are solid, but the row below each remains open for interaction. */
 static unsigned char casino_fixture_blocks(unsigned char x, unsigned char y)
 {
     if (x >= 24 && x <= 72 && y >= 72 && y <= 104) return 1;   /* Video poker */
     if (x >= 104 && x <= 152 && y >= 72 && y <= 104) return 1; /* Slots */
     if (x >= 168 && x <= 216 && y >= 72 && y <= 104) return 1; /* Blackjack */
+    if (x >= 88 && x <= 176 && y >= 136 && y <= 168) return 1; /* Roulette */
     return 0;
 }
 
@@ -1039,10 +1202,12 @@ void run_casino(void)
     unsigned char y = 200;
     unsigned char walk_frame = 0;
     unsigned char walk_timer = 0;
+    unsigned char facing = PLAYER_FACING_DOWN;
     unsigned char pad;
     unsigned char at_machine;
     unsigned char at_blackjack;
     unsigned char at_poker;
+    unsigned char at_roulette;
     unsigned char a_held = 0, a_run = 0;
 
     music_select_song(MUSIC_SONG_CASINO);
@@ -1053,6 +1218,10 @@ void run_casino(void)
         oam_flush();
 
         pad = read_pad();
+        if (pad & PAD_UP) facing = PLAYER_FACING_UP;
+        else if (pad & PAD_DOWN) facing = PLAYER_FACING_DOWN;
+        else if (pad & PAD_LEFT) facing = PLAYER_FACING_LEFT;
+        else if (pad & PAD_RIGHT) facing = PLAYER_FACING_RIGHT;
 
         if (pad & PAD_START) {
             run_inventory();
@@ -1065,6 +1234,7 @@ void run_casino(void)
         at_machine = (x >= 96 && x <= 160 && y >= 64 && y <= 112);
         at_poker = (x >= 24 && x <= 88 && y >= 64 && y <= 112);
         at_blackjack = (x >= 168 && x <= 236 && y >= 64 && y <= 120);
+        at_roulette = (x >= 80 && x <= 184 && y >= 120 && y <= 176);
 
         if (at_poker && debounce_press((unsigned char)(pad & PAD_A), &a_held, &a_run)) {
             run_poker_game();
@@ -1074,6 +1244,9 @@ void run_casino(void)
             show_casino();
         } else if (at_machine && debounce_press((unsigned char)(pad & PAD_A), &a_held, &a_run)) {
             run_slots_game();
+            show_casino();
+        } else if (at_roulette && debounce_press((unsigned char)(pad & PAD_A), &a_held, &a_run)) {
+            run_roulette_game();
             show_casino();
         } else {
             if (pad & PAD_LEFT) {
@@ -1105,6 +1278,6 @@ void run_casino(void)
             walk_frame = 0;
         }
 
-        draw_player_sprite(x, y, walk_frame);
+        draw_player_sprite(x, y, walk_frame, facing);
     }
 }

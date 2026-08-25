@@ -96,6 +96,43 @@ int main(void)
     casino_blackjack_stand(&casino);
     check_eq("blackjack stand resolves hand", casino.blackjack_state, CASINO_GAME_RESOLVED);
 
+    casino_reset(&casino);
+    casino.credits = 10;
+    casino.bet = 2;
+    payout = 0;
+    /* Find a deterministic straight-up hit without coupling this test to a
+     * particular internal step of the shared LFSR sequence. */
+    for (seed = 1; seed < 256 && !payout; ++seed) {
+        casino_reset(&casino);
+        casino.credits = 10;
+        casino.bet = 2;
+        casino.rng.state = (unsigned char)seed;
+        payout = casino_roulette_spin(&casino, 1);
+    }
+    check_eq("roulette accepts a covered straight-up bet", payout, 72);
+    check_eq("roulette winning bet returns wager plus 35:1 profit", casino.credits, 80);
+    check_eq("roulette records its resolved result", casino.roulette_state, CASINO_GAME_RESOLVED);
+
+    casino_reset(&casino);
+    casino.credits = 10;
+    casino.bet = 2;
+    payout = 0;
+    for (seed = 1; seed < 256 && !payout; ++seed) {
+        casino_reset(&casino);
+        casino.credits = 10;
+        casino.bet = 2;
+        casino.rng.state = (unsigned char)seed;
+        payout = casino_roulette_spin(&casino, CASINO_ROULETTE_RED);
+    }
+    check_eq("roulette accepts a red outside bet", payout, 4);
+    check_eq("roulette red pays even money", casino.credits, 12);
+
+    casino_reset(&casino);
+    casino.credits = 1;
+    casino.bet = 2;
+    check_eq("roulette rejects an uncovered bet", casino_roulette_spin(&casino, 1), 0);
+    check_eq("failed roulette bet preserves credits", casino.credits, 1);
+
     /* Player natural: ace + king dealt straight up. The dealer's own hand
      * starts at 11, well under 17, so casino_blackjack_stand()'s own draw
      * loop is guaranteed to add at least one more dealer card -- which

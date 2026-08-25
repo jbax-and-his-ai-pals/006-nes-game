@@ -83,7 +83,7 @@ static void show_inventory_description(unsigned char item)
     } else if (item == INVENTORY_ITEM_TOKEN) {
         show_message_box("A JUKEBOX TOKEN.", "GOOD FOR ONE SONG.", 0);
     } else if (item == INVENTORY_ITEM_SEWER_KEY) {
-        show_message_box("A RUSTY SEWER KEY.", "IT SMELLS LIKE A DRAIN.", 0);
+        show_message_box("A RUSTY SEWER KEY.", "SMELLS LIKE A DRAIN.", 0);
     } else if (item == INVENTORY_ITEM_FLAMETHROWER) {
         show_message_box("A VERY REAL", "FLAMETHROWER.", "FOR VERY REAL SLUGS.");
     } else {

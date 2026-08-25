@@ -21,6 +21,7 @@
 #include "v2_player_actor.h"
 #include "v2_regulars.h"
 #include "v2_scene_casino.h"
+#include "v2_scene_commentarium.h"
 #include "v2_scene_avenue.h"
 #include "v2_scene_bar.h"
 #include "v2_scene_mart.h"
@@ -411,6 +412,12 @@ void main(void)
         }
         v2_set_route(V2_SCENE_BAR, 0);
         bar_exit = run_bar_interior(0);
+        while (bar_exit == BAR_EXIT_COMMENTARIUM) {
+            v2_set_route(V2_SCENE_COMMENTARIUM, 0);
+            run_commentarium();
+            v2_set_route(V2_SCENE_BAR, 2);
+            bar_exit = run_bar_interior(2);
+        }
         while (bar_exit == BAR_EXIT_CASINO) {
             v2_set_route(V2_SCENE_CASINO, 0);
             run_casino();

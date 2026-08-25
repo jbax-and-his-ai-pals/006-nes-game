@@ -2,6 +2,7 @@
 
 #include "mmc3.h"
 #include "music.h"
+#include "v2_dialogue.h"
 #include "v2_inventory.h"
 #include "v2_player_actor.h"
 #include "v2_runtime.h"
@@ -47,8 +48,8 @@ static void show_neon_avenue(void)
     static const unsigned char avenue_palette[32] = {
         0x0F, 0x01, 0x28, 0x0F, 0x0F, 0x16, 0x06, 0x30,
         0x0F, 0x14, 0x0F, 0x30, 0x0F, 0x16, 0x21, 0x30,
-        0x0F, 0x16, 0x0F, 0x0F, 0x0F, 0x30, 0x27, 0x16,
-        0x0F, 0x16, 0x06, 0x30, 0x0F, 0x0F, 0x28, 0x30
+        0x0F, 0x16, 0x0F, 0x0F, 0x0F, 0x0F, 0x27, 0x30,
+        0x0F, 0x16, 0x28, 0x30, 0x0F, 0x0F, 0x0F, 0x30
     };
     unsigned char i;
 
@@ -140,6 +141,26 @@ static void show_neon_avenue(void)
     PPU.mask = 0x1E;
 }
 
+/* The traffic plate uses palette 2 for its blue-and-green treatment, but the
+ * storefront sign normally owns that palette. Move only the sign to palette 3
+ * with identical ink before showing the plate; its windows are hidden beneath
+ * the death panel, so this avoids recoloring any visible scenery. */
+static void preserve_sign_during_traffic_message(void)
+{
+    unsigned char i;
+
+    PPU.mask = 0;
+    PPU.vram.address = 0x3F;
+    PPU.vram.address = 12;
+    PPU.vram.data = 0x0F;
+    PPU.vram.data = 0x14;
+    PPU.vram.data = 0x0F;
+    PPU.vram.data = 0x30;
+    for (i = 2; i < 6; ++i) set_attribute_block(2, i, 3);
+    reset_scroll();
+    PPU.mask = 0x1E;
+}
+
 unsigned char run_neon_avenue(unsigned char arrival)
 {
     unsigned char x = arrival == 1 ? MANHOLE_X :
@@ -149,6 +170,7 @@ unsigned char run_neon_avenue(unsigned char arrival)
     unsigned char y = arrival == 1 ? 196 : 200;
     unsigned char walk_frame = 0;
     unsigned char walk_timer = 0;
+    unsigned char facing = PLAYER_FACING_DOWN;
     unsigned char pad;
     unsigned char traffic_state = 0;
     unsigned char taxi_moving_left = 0;
@@ -176,6 +198,10 @@ unsigned char run_neon_avenue(unsigned char arrival)
         oam_flush();
 
         pad = read_pad();
+        if (pad & PAD_UP) facing = PLAYER_FACING_UP;
+        else if (pad & PAD_DOWN) facing = PLAYER_FACING_DOWN;
+        else if (pad & PAD_LEFT) facing = PLAYER_FACING_LEFT;
+        else if (pad & PAD_RIGHT) facing = PLAYER_FACING_RIGHT;
         if (traffic_state == 0) {
             if (pad & PAD_START) {
                 run_inventory();
@@ -223,7 +249,7 @@ unsigned char run_neon_avenue(unsigned char arrival)
                 y >= MANHOLE_Y && y <= MANHOLE_Y + 8) {
                 return AVENUE_EXIT_SEWER;
             }
-            draw_player_sprite(x, y, walk_frame);
+            draw_player_sprite(x, y, walk_frame, facing);
         } else if (traffic_state == 1 || traffic_state == 2) {
             taxi_x += taxi_moving_left ? -3 : 3;
             if (taxi_x > -32 && taxi_x < 256) draw_taxi_sprite(taxi_x, taxi_moving_left);
@@ -244,6 +270,11 @@ unsigned char run_neon_avenue(unsigned char arrival)
                     clear_sprites();
                     draw_traffic_particles(x, taxi_moving_left);
                     draw_crash_tableau(x, taxi_moving_left);
+                    /* Palette 3 belongs to the facade's window/brick cells.
+                     * Use the sign-only palette for this temporary UI plate
+                     * so the message cannot recolor the whole bar green. */
+                    preserve_sign_during_traffic_message();
+                    dialogue_set_palette(2);
                     show_traffic_death();
                 }
             }

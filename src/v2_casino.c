@@ -7,6 +7,13 @@ static void casino_add_credits(CasinoState *casino, unsigned char amount)
                        (unsigned char)credits;
 }
 
+/* Standard American-wheel order. Pocket 37 encodes 00 because the game
+ * stores every pocket in one byte while 0 remains the ordinary single zero. */
+const unsigned char casino_roulette_wheel[CASINO_ROULETTE_POCKET_COUNT] = {
+    0, 28, 9, 26, 30, 11, 7, 20, 32, 17, 5, 22, 34, 15, 3, 24, 36, 13, 1,
+    37, 27, 10, 25, 29, 12, 8, 19, 31, 18, 6, 21, 33, 16, 4, 23, 35, 14, 2
+};
+
 static unsigned char casino_card(CasinoState *casino)
 {
     return (unsigned char)((rng_next(&casino->rng) % 13) + 1);
@@ -124,6 +131,10 @@ void casino_reset(CasinoState *casino)
     casino->reel[2] = 0;
     casino->blackjack_state = CASINO_GAME_READY;
     casino->poker_state = CASINO_GAME_READY;
+    casino->roulette_pick = 1;
+    casino->roulette_result = CASINO_ROULETTE_ZERO;
+    casino->roulette_payout = 0;
+    casino->roulette_state = CASINO_GAME_READY;
     rng_seed(&casino->rng, 0x2A);
 }
 
@@ -381,4 +392,38 @@ unsigned char casino_poker_draw(CasinoState *casino)
     casino_add_credits(casino, casino->poker_payout);
     casino->poker_state = CASINO_GAME_RESOLVED;
     return casino->poker_payout;
+}
+
+unsigned char casino_roulette_spin(CasinoState *casino, unsigned char pocket)
+{
+    unsigned char roll;
+    unsigned char payout = 0;
+
+    if (pocket >= CASINO_ROULETTE_BET_COUNT) return 0;
+    if (casino->credits < casino->bet) return 0;
+
+    casino->credits = (unsigned char)(casino->credits - casino->bet);
+    casino->roulette_pick = pocket;
+    /* Reject the 26 unused values from a masked byte. This keeps every one
+     * of the 38 wheel pockets equally likely without a modulo bias. */
+    do {
+        roll = (unsigned char)(rng_next(&casino->rng) & 63);
+    } while (roll >= CASINO_ROULETTE_POCKET_COUNT);
+    casino->roulette_result = casino_roulette_wheel[roll];
+
+    if (pocket == CASINO_ROULETTE_RED && (casino->roulette_result & 1)) {
+        payout = (unsigned char)(casino->bet * 2);
+    } else if (pocket == CASINO_ROULETTE_BLACK &&
+               casino->roulette_result != CASINO_ROULETTE_ZERO &&
+               casino->roulette_result != CASINO_ROULETTE_DOUBLE_ZERO &&
+               !(casino->roulette_result & 1)) {
+        payout = (unsigned char)(casino->bet * 2);
+    } else if (casino->roulette_result == pocket) {
+        unsigned int raw = (unsigned int)casino->bet * 36;
+        payout = raw > CASINO_MAX_CREDITS ? CASINO_MAX_CREDITS : (unsigned char)raw;
+    }
+    casino->roulette_payout = payout;
+    casino_add_credits(casino, payout);
+    casino->roulette_state = CASINO_GAME_RESOLVED;
+    return payout;
 }

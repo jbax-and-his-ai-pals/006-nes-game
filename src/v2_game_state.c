@@ -22,6 +22,8 @@ void v2_game_reset(void)
     game_state.zoo_gate_open = 0;
     game_state.has_zoo_map = 0;
     game_state.jimbles_x = 116;
+    game_state.transfer_y = 0;
+    game_state.transfer_y_valid = 0;
     v2_set_route(V2_SCENE_AVENUE, 0);
     /* casino_reset()'s own logic, inlined -- v2_casino.c moved out of the
      * fixed engine into the casino scene's own bank (see

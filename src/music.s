@@ -15,112 +15,116 @@ MUSIC_STEPS = 32
 MUSIC_SONG_COUNT = 7
 
 .segment "FIXED_ENGINE_RODATA"
-; A 32-step lounge-jazz loop: pulse 1 carries a nimble, offbeat phrase while
-; triangle walks a bass line underneath. Period bytes target NTSC APU timers.
-; Ten-frame steps keep the groove lively; the final held note creates a clear
-; turnaround before the loop returns to its opening E-G-A lift.
+; A high-energy title/avenue overture. Pulse 1 races through broken chords,
+; briefly hangs on dramatic peaks, then drops into a jagged turnaround while
+; triangle punches out wide bass leaps. It is an original late-80s NES action
+; arrangement: dense, theatrical, and deliberately less lounge-like than the
+; location loops below. Period bytes target NTSC APU timers.
 melody_lo:
-        .byte $54,$1E,$FE,$D6, $E2,$FE,$1E,$54
-        .byte $41,$FE,$D6,$BE, $D6,$FE,$1E,$54
-        .byte $7D,$41,$FE,$D6, $AA,$BE,$D6,$FE
-        .byte $1E,$E2,$BE,$AA, $BE,$E2,$FE,$1E
+        .byte $1E,$54,$7D,$54, $1E,$54,$7D,$AA
+        .byte $D6,$BE,$AA,$BE, $D6,$E2,$1E,$54
+        .byte $7D,$54,$41,$54, $7D,$AA,$BE,$AA
+        .byte $7D,$54,$1E,$E2, $D6,$BE,$AA,$FE
 melody_hi:
-        .byte $F9,$F9,$F8,$F8, $F8,$F8,$F9,$F9
-        .byte $F9,$F8,$F8,$F8, $F8,$F8,$F9,$F9
-        .byte $F9,$F9,$F8,$F8, $F8,$F8,$F8,$F8
-        .byte $F9,$F8,$F8,$F8, $F8,$F8,$F8,$F9
+        .byte $F9,$F9,$F9,$F9, $F9,$F9,$F9,$F8
+        .byte $F8,$F8,$F8,$F8, $F8,$F8,$F9,$F9
+        .byte $F9,$F9,$F9,$F9, $F9,$F8,$F8,$F8
+        .byte $F9,$F9,$F9,$F8, $F8,$F8,$F8,$F8
 bass_lo:
-        .byte $57,$3D,$FE,$3D, $85,$57,$FD,$3D
-        .byte $FE,$A9,$85,$57, $3D,$FD,$A9,$FE
-        .byte $FD,$FE,$C7,$85, $A9,$FD,$57,$3D
-        .byte $3D,$C7,$FD,$A9, $FD,$C7,$FE,$3D
+        .byte $57,$57,$57,$57, $85,$85,$85,$85
+        .byte $3D,$3D,$3D,$3D, $A9,$A9,$A9,$A9
+        .byte $57,$57,$57,$57, $C7,$C7,$C7,$C7
+        .byte $3D,$3D,$85,$85, $A9,$A9,$57,$57
 bass_hi:
-        .byte $FB,$FA,$F9,$FA, $FA,$FB,$FA,$FA
-        .byte $F9,$FA,$FA,$FB, $FA,$FA,$FA,$F9
-        .byte $FA,$F9,$F9,$FA, $FA,$FA,$FB,$FA
-        .byte $FA,$F9,$FA,$FA, $FA,$F9,$F9,$FA
+        .byte $FB,$FB,$FB,$FB, $FA,$FA,$FA,$FA
+        .byte $FA,$FA,$FA,$FA, $F9,$F9,$F9,$F9
+        .byte $FB,$FB,$FB,$FB, $F9,$F9,$F9,$F9
+        .byte $FA,$FA,$FA,$FA, $F9,$F9,$FB,$FB
 step_frames:
-        .byte 10,10,10,10, 10,10,10,10
-        .byte 10,10,10,10, 10,10,10,10
-        .byte 10,10,10,10, 10,10,10,10
-        .byte 10,10,10,10, 10,10,10,20
+        .byte 4,4,4,4, 4,4,4,7
+        .byte 5,4,4,4, 5,7,4,6
+        .byte 4,4,4,4, 5,4,6,4
+        .byte 4,4,5,4, 6,4,5,14
 
-; Each location gets a 16-note motif repeated once. The familiar Avenue
-; arrangement above remains song zero; these variants keep the same light
-; CPU cost while making scene changes immediately audible.
+; Each location has a complete 32-step arrangement. The second half answers
+; or detours from the opening phrase rather than repeating it, so a room can
+; breathe for a while before its loop comes back around. This is still just
+; table lookup in NMI: no game-loop work and no extra timing risk.
 bar_melody_lo:
-        .byte $D6,$BE,$AA,$BE,$D6,$FE,$E2,$BE, $D6,$BE,$AA,$BE,$D6,$FE,$E2,$BE
-bar_melody_hi:
-        .byte $F8,$F8,$F8,$F8,$F8,$F8,$F8,$F8, $F8,$F8,$F8,$F8,$F8,$F8,$F8,$F8
+        .byte $D6,$BE,$AA,$BE,$D6,$FE,$E2,$BE, $D6,$AA,$BE,$D6,$E2,$FE,$1E,$D6
+        .byte $BE,$AA,$7D,$AA,$BE,$D6,$FE,$E2, $D6,$BE,$AA,$BE,$D6,$E2,$FE,$1E
+; The location melodies vary by pitch table; a shared octave contour keeps
+; their 32-step arrangements compact enough to preserve fixed-engine slack.
+variant_melody_hi:
+        .byte $F8,$F8,$F8,$F8,$F8,$F8,$F8,$F8, $F8,$F8,$F8,$F8,$F8,$F8,$F9,$F8
+        .byte $F8,$F8,$F9,$F8,$F8,$F8,$F8,$F8, $F8,$F8,$F8,$F8,$F8,$F8,$F8,$F9
 bar_step_frames:
-        .byte 6,6,12,6, 8,6,16,8, 6,6,12,6, 8,6,10,18
+        .byte 6,6,12,6, 8,6,16,8, 5,7,9,6, 12,5,10,15
+        .byte 7,5,12,6, 8,7,14,6, 6,8,10,5, 12,7,9,20
 mart_melody_lo:
-        .byte $54,$41,$54,$7D,$54,$41,$54,$1E, $54,$41,$54,$7D,$54,$41,$54,$1E
-mart_melody_hi:
-        .byte $F9,$F9,$F9,$F9,$F9,$F9,$F9,$F9, $F9,$F9,$F9,$F9,$F9,$F9,$F9,$F9
+        .byte $54,$41,$54,$7D,$54,$41,$54,$1E, $41,$54,$7D,$AA,$7D,$54,$41,$1E
+        .byte $54,$7D,$AA,$7D,$54,$41,$54,$1E, $41,$54,$7D,$54,$41,$1E,$54,$7D
 mart_step_frames:
-        .byte 5,5,5,10, 5,5,7,14, 5,5,5,10, 5,5,7,18
+        .byte 5,5,5,10, 5,5,7,14, 4,6,5,9, 7,5,8,13
+        .byte 5,7,6,10, 4,6,5,15, 6,5,8,5, 7,12,5,18
 sewer_melody_lo:
-        .byte $E2,$FE,$D6,$FE,$BE,$FE,$D6,$FE, $E2,$FE,$D6,$FE,$BE,$FE,$D6,$FE
-sewer_melody_hi:
-        .byte $F8,$F8,$F8,$F8,$F8,$F8,$F8,$F8, $F8,$F8,$F8,$F8,$F8,$F8,$F8,$F8
+        .byte $E2,$FE,$D6,$FE,$BE,$FE,$D6,$FE, $AA,$FE,$BE,$FE,$D6,$FE,$E2,$FE
+        .byte $D6,$FE,$BE,$FE,$AA,$FE,$BE,$FE, $D6,$FE,$E2,$FE,$D6,$FE,$BE,$FE
 sewer_step_frames:
-        .byte 18,8,14,8, 20,8,12,16, 18,8,14,8, 20,8,12,24
+        .byte 18,8,14,8, 20,8,12,16, 16,7,18,9, 14,8,22,10
+        .byte 15,8,20,8, 13,9,17,7, 21,8,14,10, 18,8,16,26
 park_melody_lo:
-        .byte $1E,$54,$7D,$54,$1E,$54,$41,$54, $1E,$54,$7D,$54,$1E,$54,$41,$54
-park_melody_hi:
-        .byte $F9,$F9,$F9,$F9,$F9,$F9,$F9,$F9, $F9,$F9,$F9,$F9,$F9,$F9,$F9,$F9
+        .byte $1E,$54,$7D,$54,$1E,$54,$41,$54, $7D,$AA,$7D,$54,$41,$54,$1E,$54
+        .byte $54,$7D,$AA,$BE,$AA,$7D,$54,$41, $1E,$54,$7D,$54,$41,$54,$1E,$54
 park_step_frames:
-        .byte 8,6,10,6, 12,6,8,16, 8,6,10,6, 12,6,8,20
+        .byte 8,6,10,6, 12,6,8,16, 6,7,9,5, 11,7,10,14
+        .byte 7,8,6,12, 5,9,7,11, 10,6,8,6, 12,7,9,22
 casino_melody_lo:
         .byte $54,$1E,$54,$7D,$41,$54,$1E,$54, $D6,$BE,$D6,$54,$41,$54,$7D,$54
-casino_melody_hi:
-        .byte $F9,$F9,$F9,$F9,$F9,$F9,$F9,$F9, $F8,$F8,$F8,$F9,$F9,$F9,$F9,$F9
+        .byte $1E,$54,$7D,$AA,$7D,$54,$41,$54, $D6,$E2,$D6,$BE,$AA,$7D,$54,$1E
 casino_step_frames:
         .byte 4,4,6,4, 8,4,4,10, 4,4,6,4, 8,4,6,14
+        .byte 5,4,7,5, 8,4,6,10, 4,5,6,4, 9,5,7,16
 zoo_melody_lo:
         .byte $7D,$54,$41,$54,$7D,$AA,$7D,$54, $41,$54,$7D,$AA,$BE,$AA,$7D,$54
-zoo_melody_hi:
-        .byte $F9,$F9,$F9,$F9,$F9,$F8,$F9,$F9, $F9,$F9,$F9,$F8,$F8,$F8,$F9,$F9
+        .byte $54,$7D,$AA,$BE,$D6,$BE,$AA,$7D, $54,$41,$54,$7D,$AA,$7D,$54,$1E
 zoo_step_frames:
-        .byte 10,8,12,8, 14,8,10,16, 10,8,12,8, 14,8,10,22
+        .byte 10,8,12,8, 14,8,10,16, 9,7,11,8, 13,9,12,15
+        .byte 8,10,7,12, 14,8,10,9, 11,8,10,7, 13,9,11,24
 
-bar_bass_lo:   .repeat 2
-        .byte $57,$57,$85,$85,$3D,$3D,$57,$57
-        .endrepeat
-bar_bass_hi:   .repeat 2
-        .byte $FB,$FB,$FA,$FA,$FA,$FA,$FB,$FB
-        .endrepeat
-mart_bass_lo:  .repeat 2
-        .byte $57,$57,$3D,$3D,$57,$57,$85,$85
-        .endrepeat
-mart_bass_hi:  .repeat 2
-        .byte $FB,$FB,$FA,$FA,$FB,$FB,$FA,$FA
-        .endrepeat
-sewer_bass_lo: .repeat 2
-        .byte $3D,$3D,$FE,$FE,$A9,$A9,$FE,$FE
-        .endrepeat
-sewer_bass_hi: .repeat 2
-        .byte $FA,$FA,$FA,$FA,$F9,$F9,$FA,$FA
-        .endrepeat
-park_bass_lo:  .repeat 2
-        .byte $85,$85,$57,$57,$3D,$3D,$57,$57
-        .endrepeat
-park_bass_hi:  .repeat 2
-        .byte $FA,$FA,$FB,$FB,$FA,$FA,$FB,$FB
-        .endrepeat
-casino_bass_lo:.repeat 2
-        .byte $57,$3D,$85,$57,$A9,$85,$57,$3D
-        .endrepeat
-casino_bass_hi:.repeat 2
-        .byte $FB,$FA,$FA,$FB,$F9,$FA,$FB,$FA
-        .endrepeat
-zoo_bass_lo:   .repeat 2
-        .byte $85,$57,$85,$3D,$57,$85,$A9,$85
-        .endrepeat
-zoo_bass_hi:   .repeat 2
-        .byte $FA,$FB,$FA,$FA,$FB,$FA,$F9,$FA
-        .endrepeat
+bar_bass_lo:
+        .byte $57,$57,$85,$85,$3D,$3D,$57,$57, $A9,$A9,$57,$57,$85,$85,$3D,$3D
+        .byte $57,$57,$3D,$3D,$85,$85,$57,$57, $A9,$57,$85,$3D,$57,$57,$3D,$3D
+mart_bass_lo:
+        .byte $57,$57,$3D,$3D,$57,$57,$85,$85, $3D,$3D,$57,$57,$A9,$A9,$85,$85
+        .byte $57,$57,$85,$85,$3D,$3D,$57,$57, $A9,$A9,$57,$57,$3D,$3D,$85,$85
+mart_bass_hi:
+        .byte $FB,$FB,$FA,$FA,$FB,$FB,$FA,$FA, $FA,$FA,$FB,$FB,$F9,$F9,$FA,$FA
+        .byte $FB,$FB,$FA,$FA,$FA,$FA,$FB,$FB, $F9,$F9,$FB,$FB,$FA,$FA,$FA,$FA
+sewer_bass_lo:
+        .byte $3D,$3D,$FE,$FE,$A9,$A9,$FE,$FE, $57,$57,$FE,$FE,$85,$85,$FE,$FE
+        .byte $3D,$3D,$FE,$FE,$57,$57,$FE,$FE, $A9,$A9,$FE,$FE,$85,$85,$FE,$FE
+sewer_bass_hi:
+        .byte $FA,$FA,$FA,$FA,$F9,$F9,$FA,$FA, $FB,$FB,$FA,$FA,$FA,$FA,$FA,$FA
+        .byte $FA,$FA,$FA,$FA,$FB,$FB,$FA,$FA, $F9,$F9,$FA,$FA,$FA,$FA,$FA,$FA
+park_bass_lo:
+        .byte $85,$85,$57,$57,$3D,$3D,$57,$57, $A9,$A9,$57,$57,$85,$85,$3D,$3D
+        .byte $57,$57,$85,$85,$A9,$A9,$57,$57, $3D,$3D,$57,$57,$85,$85,$57,$57
+park_bass_hi:
+        .byte $FA,$FA,$FB,$FB,$FA,$FA,$FB,$FB, $F9,$F9,$FB,$FB,$FA,$FA,$FA,$FA
+        .byte $FB,$FB,$FA,$FA,$F9,$F9,$FB,$FB, $FA,$FA,$FB,$FB,$FA,$FA,$FB,$FB
+casino_bass_lo:
+        .byte $57,$3D,$85,$57,$A9,$85,$57,$3D, $57,$A9,$85,$57,$3D,$57,$85,$A9
+        .byte $3D,$57,$85,$A9,$57,$3D,$57,$85, $A9,$85,$57,$3D,$57,$85,$A9,$57
+casino_bass_hi:
+        .byte $FB,$FA,$FA,$FB,$F9,$FA,$FB,$FA, $FB,$F9,$FA,$FB,$FA,$FB,$FA,$F9
+        .byte $FA,$FB,$FA,$F9,$FB,$FA,$FB,$FA, $F9,$FA,$FB,$FA,$FB,$FA,$F9,$FB
+zoo_bass_lo:
+        .byte $85,$57,$85,$3D,$57,$85,$A9,$85, $57,$3D,$57,$85,$A9,$85,$57,$3D
+        .byte $85,$A9,$85,$57,$3D,$57,$85,$A9, $85,$57,$3D,$57,$85,$A9,$85,$57
+zoo_bass_hi:
+        .byte $FA,$FB,$FA,$FA,$FB,$FA,$F9,$FA, $FB,$FA,$FB,$FA,$F9,$FA,$FB,$FA
+        .byte $FA,$F9,$FA,$FB,$FA,$FB,$FA,$F9, $FA,$FB,$FA,$FB,$FA,$F9,$FA,$FB
 
 ; One-shot Jimbles's jukebox fanfare, transcribed directly from the requested
 ; A5 A5 G5 F5 F5 F5 G5 A5 F5 F5 F5 G5 G5 F5 E5 F5 phrase. Each note lasts
@@ -265,9 +269,6 @@ music_load_step:
 
 .macro LOAD_VARIANT melodylo, melodyhi, basslo, basshi, frames
         ldx music_step
-        txa
-        and #$0F
-        tax
         lda frames,x
         sta music_frames
         lda melodylo,x
@@ -284,17 +285,17 @@ music_load_step:
 music_load_avenue:
         LOAD_SONG melody_lo, melody_hi, bass_lo, bass_hi
 music_load_bar:
-        LOAD_VARIANT bar_melody_lo, bar_melody_hi, bar_bass_lo, bar_bass_hi, bar_step_frames
+        LOAD_VARIANT bar_melody_lo, variant_melody_hi, bar_bass_lo, park_bass_hi, bar_step_frames
 music_load_mart:
-        LOAD_VARIANT mart_melody_lo, mart_melody_hi, mart_bass_lo, mart_bass_hi, mart_step_frames
+        LOAD_VARIANT mart_melody_lo, variant_melody_hi, mart_bass_lo, mart_bass_hi, mart_step_frames
 music_load_sewer:
-        LOAD_VARIANT sewer_melody_lo, sewer_melody_hi, sewer_bass_lo, sewer_bass_hi, sewer_step_frames
+        LOAD_VARIANT sewer_melody_lo, variant_melody_hi, sewer_bass_lo, sewer_bass_hi, sewer_step_frames
 music_load_park:
-        LOAD_VARIANT park_melody_lo, park_melody_hi, park_bass_lo, park_bass_hi, park_step_frames
+        LOAD_VARIANT park_melody_lo, variant_melody_hi, park_bass_lo, park_bass_hi, park_step_frames
 music_load_casino:
-        LOAD_VARIANT casino_melody_lo, casino_melody_hi, casino_bass_lo, casino_bass_hi, casino_step_frames
+        LOAD_VARIANT casino_melody_lo, variant_melody_hi, casino_bass_lo, casino_bass_hi, casino_step_frames
 music_load_zoo:
-        LOAD_VARIANT zoo_melody_lo, zoo_melody_hi, zoo_bass_lo, zoo_bass_hi, zoo_step_frames
+        LOAD_VARIANT zoo_melody_lo, variant_melody_hi, zoo_bass_lo, zoo_bass_hi, zoo_step_frames
 
 ; Legacy loader body retained below for source history.
 music_load_step_legacy:

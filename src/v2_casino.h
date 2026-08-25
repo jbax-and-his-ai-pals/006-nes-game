@@ -24,6 +24,15 @@ enum {
     CASINO_GAME_RESOLVED
 };
 
+enum {
+    CASINO_ROULETTE_ZERO = 0,
+    CASINO_ROULETTE_DOUBLE_ZERO = 37,
+    CASINO_ROULETTE_POCKET_COUNT = 38,
+    CASINO_ROULETTE_RED = 38,
+    CASINO_ROULETTE_BLACK = 39,
+    CASINO_ROULETTE_BET_COUNT = 40
+};
+
 /* Ranked worst to best (standard video poker hand order); casino_poker_
  * result() returns the best one the current hand qualifies for, and
  * casino_poker_payout()'s multiplier table (see v2_casino.c) follows this
@@ -62,6 +71,10 @@ typedef struct {
     unsigned char poker_held;
     unsigned char poker_state;
     unsigned char poker_payout;
+    unsigned char roulette_pick;
+    unsigned char roulette_result;
+    unsigned char roulette_payout;
+    unsigned char roulette_state;
     RngState rng;
 } CasinoState;
 
@@ -85,5 +98,11 @@ unsigned char casino_poker_payout(const CasinoState *casino);
  * follows this same result, just expressed as a number instead of a name;
  * the two never disagree about which hand won. */
 unsigned char casino_poker_result(const CasinoState *casino);
+
+/* Spins the American 0/00/1-36 wheel. A straight-up hit returns 36 times the
+ * wager (original stake plus 35:1 profit); red/black wins return 2 times the
+ * wager (original stake plus 1:1 profit). */
+unsigned char casino_roulette_spin(CasinoState *casino, unsigned char pocket);
+extern const unsigned char casino_roulette_wheel[CASINO_ROULETTE_POCKET_COUNT];
 
 #endif

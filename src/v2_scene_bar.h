@@ -3,6 +3,7 @@
 
 #define BAR_EXIT_AVENUE 0
 #define BAR_EXIT_CASINO 1
+#define BAR_EXIT_COMMENTARIUM 2
 
 unsigned char run_bar_interior(unsigned char from_casino);
 

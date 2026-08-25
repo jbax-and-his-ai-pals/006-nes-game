@@ -100,8 +100,8 @@ static void show_bar_interior(void)
         /* BG pal3: Piss Corner streaks/puddles. Index 2 stays black for
          * the dark recess, while index 3 is the pale wall fixture. */
         0x0F, 0x28, 0x0F, 0x30,
-        0x07, 0x0F, 0x0F, 0x0F, 0x0F, 0x16, 0x27, 0x30,
-        0x0F, 0x28, 0x0F, 0x30, 0x0F, 0x0F, 0x0F, 0x0F
+        0x07, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x27, 0x30,
+        0x0F, 0x28, 0x0F, 0x30, 0x0F, 0x0F, 0x0F, 0x30
     };
     unsigned char i;
 
@@ -138,6 +138,12 @@ static void show_bar_interior(void)
         set_tile(i, 25, BAR_TILE_DOOR_JAMB);
         set_tile(i, 26, BAR_TILE_DOOR_FILL);
         set_tile(i, 27, BAR_TILE_DOOR_JAMB);
+    }
+    /* A small north-west side door leads to the Commentarium next door. */
+    for (i = 3; i < 6; ++i) {
+        set_tile(i, 4, BAR_TILE_DOOR_JAMB);
+        set_tile(i, 5, BAR_TILE_DOOR_FILL);
+        set_tile(i, 6, BAR_TILE_DOOR_JAMB);
     }
 
     /* Shelf and counter, with Jimbles (a sprite, drawn below) standing
@@ -195,6 +201,17 @@ static void show_bar_interior(void)
     set_attribute_block(6, 6, 3);
     set_attribute_block(6, 7, 3);
 
+    /* Attribute bytes divide their 32px cells into four 16px palette
+     * quadrants. Keep the upper half of Piss Corner on the normal wood
+     * palette, then begin its yellowed floor below it. That trims the
+     * nook's top edge without moving its puddles, regulars, or bounds. */
+    PPU.vram.address = 0x23;
+    PPU.vram.address = 0xE6;
+    PPU.vram.data = 0xF0;
+    PPU.vram.address = 0x23;
+    PPU.vram.address = 0xE7;
+    PPU.vram.data = 0xF0;
+
     clear_sprites();
     draw_jimbles();
     draw_bar_patron();
@@ -207,6 +224,16 @@ static void show_bar_interior(void)
     oam_flush();
     reset_scroll();
     PPU.mask = 0x1E;
+}
+
+static void show_bar_message(const char *line1, const char *line2,
+                             const char *line3)
+{
+    /* Piss Corner owns background palette 3. Render dialogue through the
+     * otherwise unused palette 1 so exposed puddle cells keep their yellow. */
+    dialogue_set_palette(1);
+    show_message_box(line1, line2, line3);
+    dialogue_set_palette(3);
 }
 
 /* The bar counter/shelf/patron block (rows 5-9, cols 8-23 -- see
@@ -231,16 +258,17 @@ static unsigned char blocked_by_counter(unsigned char x, unsigned char y)
  * there's much less per-frame work either way, but the pattern stays
  * consistent rather than relying on "this scene is simple enough that
  * the old order would've been fine anyway." */
-unsigned char run_bar_interior(unsigned char from_casino)
+unsigned char run_bar_interior(unsigned char arrival)
 {
-    /* Coming back from the casino drops the player right at the
-     * backroom door (just south of its threshold) instead of all the
-     * way back at the avenue entrance, matching how walking out of the
-     * door was what got them there in the first place. */
-    unsigned char x = from_casino ? 212 : 120;
-    unsigned char y = from_casino ? 56 : 208;
+    /* Each interior return gets its own doorway-adjacent spawn rather
+     * than dropping the player at the avenue entrance. The Commentarium
+     * side door is in the upper-left wall at x 24-56, so arrival 2 lands
+     * just below it at the same practical walking position. */
+    unsigned char x = arrival == 1 ? 212 : (arrival == 2 ? 40 : 120);
+    unsigned char y = arrival == 1 ? 56 : (arrival == 2 ? 56 : 208);
     unsigned char walk_frame = 0;
     unsigned char walk_timer = 0;
+    unsigned char facing = PLAYER_FACING_DOWN;
     unsigned char pad;
     unsigned char door_prompted = 0;
     unsigned char jukebox_prompted = 0;
@@ -289,6 +317,10 @@ unsigned char run_bar_interior(unsigned char from_casino)
         draw_regulars();
 
         pad = read_pad();
+        if (pad & PAD_UP) facing = PLAYER_FACING_UP;
+        else if (pad & PAD_DOWN) facing = PLAYER_FACING_DOWN;
+        else if (pad & PAD_LEFT) facing = PLAYER_FACING_LEFT;
+        else if (pad & PAD_RIGHT) facing = PLAYER_FACING_RIGHT;
         if (pad & PAD_START) {
             run_inventory();
             show_bar_interior();
@@ -319,6 +351,8 @@ unsigned char run_bar_interior(unsigned char from_casino)
             if (y > 48) {
                 if (!blocked_by_counter(x, (unsigned char)(y - 1))) --y;
                 door_prompted = 0;
+            } else if (x >= 24 && x <= 56) {
+                return BAR_EXIT_COMMENTARIUM;
             } else if (x >= 200 && x <= 224) {
                 if (door_unlocked) {
                     return BAR_EXIT_CASINO;
@@ -331,7 +365,7 @@ unsigned char run_bar_interior(unsigned char from_casino)
                  * once the player actually steps back from the wall. */
                 if (!door_prompted) {
                     door_prompted = 1;
-                    show_message_box("THE DOOR IS LOCKED.", 0, 0);
+                    show_bar_message("THE DOOR IS LOCKED.", 0, 0);
                     show_bar_interior();
                 }
             } else {
@@ -361,7 +395,7 @@ unsigned char run_bar_interior(unsigned char from_casino)
             token_taken = 1;
             has_token = 1;
             oam_buf[TOKEN_OAM_SLOT * 4] = 0xFF;
-            show_message_box("YOU FOUND A JUKEBOX", "TOKEN.", 0);
+            show_bar_message("YOU FOUND A JUKEBOX", "TOKEN.", 0);
             show_bar_interior();
         }
         /* Spend it standing near the jukebox. Position-gated like the
@@ -380,9 +414,9 @@ unsigned char run_bar_interior(unsigned char from_casino)
                      * statement of it -- the click is the mechanism, the
                      * player connects the dots on the next locked-door
                      * message (or just by trying the door). */
-                    show_message_box("THE JUKEBOX ROARS", "TO LIFE... CLICK.", 0);
+                    show_bar_message("THE JUKEBOX ROARS", "TO LIFE... CLICK.", 0);
                 } else {
-                    show_message_box("THE JUKEBOX NEEDS", "A TOKEN.", 0);
+                    show_bar_message("THE JUKEBOX NEEDS", "A TOKEN.", 0);
                 }
                 show_bar_interior();
             }
@@ -402,13 +436,13 @@ unsigned char run_bar_interior(unsigned char from_casino)
                 jimbles_prompted = 1;
                 if (!has_beer) {
                     has_beer = 1;
-                    show_message_box("JIMBLES: FIRST ONE'S", "ON THE HOUSE, PAL.",
+                    show_bar_message("JIMBLES: FIRST ONE'S", "ON THE HOUSE, PAL.",
                                      "HE HANDS YOU A BEER.");
                 } else if (!jimbles_limit_given) {
                     jimbles_limit_given = 1;
-                    show_message_box("JIMBLES: ONE'S YOUR", "LIMIT, PAL.", 0);
+                    show_bar_message("JIMBLES: ONE'S YOUR", "LIMIT, PAL.", 0);
                 } else {
-                    show_message_box("JIMBLES: EVERYONE", "HERE'S A FUCKING", "SLUG.");
+                    show_bar_message("JIMBLES: EVERYONE", "HERE'S A FUCKING", "SLUG.");
                 }
                 show_bar_interior();
             }
@@ -421,7 +455,7 @@ unsigned char run_bar_interior(unsigned char from_casino)
         if (x >= 80 && x <= 103 && y >= 88 && y <= 112) {
             if ((pad & PAD_A) && !patron_prompted) {
                 patron_prompted = 1;
-                show_message_box("THE PATRON JUST", "GRUNTS AT YOU.", 0);
+                show_bar_message("THE PATRON JUST", "GRUNTS AT YOU.", 0);
                 show_bar_interior();
             }
         } else {
@@ -434,7 +468,7 @@ unsigned char run_bar_interior(unsigned char from_casino)
         if (x >= 184 && x <= 216 && y >= 160 && y <= 208) {
             if ((pad & PAD_A) && !piss_regular_one_prompted) {
                 piss_regular_one_prompted = 1;
-                show_message_box("JIMBLES BANISHED ME", "FOR SPILLING A BEER.", 0);
+                show_bar_message("JIMBLES BANISHED ME", "FOR SPILLING A BEER.", 0);
                 show_bar_interior();
             }
         } else {
@@ -444,11 +478,11 @@ unsigned char run_bar_interior(unsigned char from_casino)
             if ((pad & PAD_A) && !piss_regular_two_prompted) {
                 piss_regular_two_prompted = 1;
                 if (piss_regular_two_dialogue == 0) {
-                    show_message_box("STINKS IN HERE.", 0, 0);
+                    show_bar_message("STINKS IN HERE.", 0, 0);
                 } else if (piss_regular_two_dialogue == 1) {
-                    show_message_box("SMELLS LIKE MEAT.", 0, 0);
+                    show_bar_message("SMELLS LIKE MEAT.", 0, 0);
                 } else {
-                    show_message_box("ROTTEN MEAT.", 0, 0);
+                    show_bar_message("ROTTEN MEAT.", 0, 0);
                 }
                 piss_regular_two_dialogue = (unsigned char)((piss_regular_two_dialogue + 1) % 3);
                 show_bar_interior();
@@ -457,6 +491,6 @@ unsigned char run_bar_interior(unsigned char from_casino)
             piss_regular_two_prompted = 0;
         }
 
-        draw_player_sprite(x, y, walk_frame);
+        draw_player_sprite(x, y, walk_frame, facing);
     }
 }

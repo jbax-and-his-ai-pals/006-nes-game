@@ -5,6 +5,7 @@
  * controller latch or sprite-DMA page directly. */
 #define PAD_A     0x01
 #define PAD_B     0x02
+#define PAD_SELECT 0x04
 #define PAD_START 0x08
 #define PAD_UP    0x10
 #define PAD_DOWN  0x20

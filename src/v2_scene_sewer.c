@@ -11,6 +11,8 @@
 #include "v2_scene_ui.h"
 #include "v2_traffic.h"
 
+extern volatile unsigned char banked_scene_arg;
+
 #define NEON_TILE_ASPHALT 192
 #define NEON_TILE_SIDEWALK 193
 #define NEON_TILE_WINDOW_V 210
@@ -30,6 +32,8 @@ static void show_sewer_message(const char *line1, const char *line2)
 
     PPU.mask = 0;
     mmc3_use_common_chr();
+    /* Palette 3 is unused by sewer scenery, so dialogue cannot recolor it. */
+    dialogue_set_palette(3);
     show_traffic_death_message(line1, line2);
 
     do {
@@ -54,8 +58,8 @@ static void show_sewer_room(unsigned char room)
     static const unsigned char sewer_palette[32] = {
         0x0F, 0x01, 0x21, 0x30, 0x0F, 0x00, 0x10, 0x30,
         0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F,
-        0x0F, 0x16, 0x0F, 0x0F, 0x0F, 0x28, 0x21, 0x30,
-        0x0F, 0x16, 0x06, 0x30, 0x0F, 0x0F, 0x28, 0x30
+        0x0F, 0x16, 0x0F, 0x0F, 0x0F, 0x0F, 0x27, 0x30,
+        0x0F, 0x16, 0x06, 0x30, 0x0F, 0x0F, 0x0F, 0x30
     };
     unsigned char i;
 
@@ -85,19 +89,8 @@ static void show_sewer_room(unsigned char room)
                 set_tile(i, 16, NEON_TILE_SIDEWALK);
             }
         }
-    } else if (room == 1) {
-        /* Match the shaft room: a solid upper wall gives the junction a
-         * proper floor line, while open side edges advertise both routes. */
-        fill_title_rect(3, 0, 32, 10, BAR_TILE_WALL);
-        fill_title_rect(13, 0, 2, 12, BAR_TILE_FLOOR);
-        fill_title_rect(13, 30, 2, 12, BAR_TILE_FLOOR);
-        draw_text(1, 10, "FLOW JUNCTION");
-        fill_title_rect(6, 2, 28, 3, NEON_TILE_WINDOW_FILL);
-        fill_title_rect(6, 2, 28, 1, SEWER_TILE_FRAME_T);
-        set_tile(6, 2, SEWER_TILE_FRAME_TL);
-        for (i = 2; i < 30; i += 3) set_tile(7, i, NEON_TILE_WINDOW_V);
-        set_tile(8, 2, SEWER_TILE_FRAME_TL);
     } else {
+        /* The key tunnel is the sole connection between the two ladders. */
         fill_title_rect(3, 0, 32, 10, BAR_TILE_WALL);
         fill_title_rect(13, 0, 2, 12, BAR_TILE_FLOOR);
         fill_title_rect(13, 30, 2, 12, BAR_TILE_FLOOR);
@@ -130,16 +123,17 @@ static unsigned char sewer_upper_wall_blocks(unsigned char room, unsigned char x
                                              unsigned char y)
 {
     if (room == 0) return y <= 112 && (x < 120 || x > 136);
-    return (room == 1 || room == 2) && y <= 112;
+    return room == 1 && y <= 112;
 }
 
 unsigned char run_sewer(void)
 {
-    unsigned char x = 128;
-    unsigned char y = 56;
-    unsigned char room = 0;
+    unsigned char x = banked_scene_arg ? 232 : 128;
+    unsigned char y = banked_scene_arg && game_state.transfer_y_valid ? game_state.transfer_y : 56;
+    unsigned char room = banked_scene_arg ? 1 : 0;
     unsigned char walk_frame = 0;
     unsigned char walk_timer = 0;
+    unsigned char facing = PLAYER_FACING_DOWN;
     unsigned char pad;
     unsigned char traffic_state = 0;
     unsigned char taxi_moving_left = 0;
@@ -147,6 +141,15 @@ unsigned char run_sewer(void)
     unsigned char death_released = 0;
     int taxi_x = 0;
 
+    /* The hatch can be exited on the shaft's lower floor, which extends a
+     * few pixels beyond the key tunnel's walkable floor. Preserve the
+     * lateral y value whenever it fits, then clamp only that edge case. */
+    if (banked_scene_arg && y > 208) y = 208;
+
+    /* A zoo-hatch return resumes at the key-side tunnel. Both bridge values
+     * are consumed immediately so unrelated scene entries use their defaults. */
+    banked_scene_arg = 0;
+    game_state.transfer_y_valid = 0;
     music_select_song(MUSIC_SONG_SEWER);
     show_sewer_room(room);
     for (;;) {
@@ -154,6 +157,10 @@ unsigned char run_sewer(void)
         reset_scroll();
         oam_flush();
         pad = read_pad();
+        if (pad & PAD_UP) facing = PLAYER_FACING_UP;
+        else if (pad & PAD_DOWN) facing = PLAYER_FACING_DOWN;
+        else if (pad & PAD_LEFT) facing = PLAYER_FACING_LEFT;
+        else if (pad & PAD_RIGHT) facing = PLAYER_FACING_RIGHT;
 
         if (traffic_state == 0 && (pad & PAD_START)) {
             run_inventory();
@@ -172,13 +179,13 @@ unsigned char run_sewer(void)
         } else if (traffic_state == 0 && (pad & PAD_RIGHT)) {
             if (x < 236) {
                 if (!sewer_upper_wall_blocks(room, x + 1, y)) ++x;
-            } else if (room < 2) {
-                if (room != 0 || y > 112) {
-                    ++room;
-                    x = 24;
-                    show_sewer_room(room);
-                }
-            } else {
+            } else if (room == 0 && y > 112) {
+                ++room;
+                x = 24;
+                show_sewer_room(room);
+            } else if (room == 1) {
+                game_state.transfer_y = y;
+                game_state.transfer_y_valid = 1;
                 return SEWER_EXIT_ZOO;
             }
         }
@@ -187,17 +194,21 @@ unsigned char run_sewer(void)
                 if (!sewer_upper_wall_blocks(room, x, y - 1)) --y;
             } else if (room == 0 && x >= 104 && x <= 152) return SEWER_EXIT_AVENUE;
         } else if (traffic_state == 0 && (pad & PAD_DOWN)) {
-            if (y < (room < 2 ? 216 : 208) &&
+            if (y < (room == 0 ? 216 : 208) &&
                 !sewer_upper_wall_blocks(room, x, y + 1)) ++y;
         }
-        if (room == 2 && !has_sewer_key && x >= 164 && x <= 196 &&
+        if (room == 1 && !has_sewer_key && x >= 164 && x <= 196 &&
             y >= 144 && y <= 176) {
             has_sewer_key = 1;
             show_sewer_message("YOU FOUND A SEWER KEY.",
-                               "IT SMELLS LIKE A DRAIN.");
+                               "SMELLS LIKE A DRAIN.");
             show_sewer_room(room);
         }
-        if (traffic_state == 0 && room < 2 && y >= 214) {
+        /* The key tunnel's floor ends at y=208, so its road trigger needs
+         * to begin just above that limit while the ladder shaft keeps the
+         * lower edge used by the other underground scenes. */
+        if (traffic_state == 0 &&
+            ((room == 0 && y >= 214) || (room == 1 && y >= 206))) {
             traffic_state = 1;
             taxi_moving_left = x < 128;
             taxi_x = taxi_moving_left ? 224 : 0;
@@ -226,6 +237,8 @@ unsigned char run_sewer(void)
                      * not the sewer scenery replacements. */
                     PPU.mask = 0;
                     mmc3_use_common_chr();
+                    /* Keep the blue road on its scenery palette during the overlay. */
+                    dialogue_set_palette(3);
                     show_traffic_death_message("HOW THE HELL DID A", "TAXI GET DOWN HERE?");
                 }
             }
@@ -244,6 +257,6 @@ unsigned char run_sewer(void)
             walk_timer = 0;
             walk_frame = 0;
         }
-        if (traffic_state == 0) draw_player_sprite(x, y, walk_frame);
+        if (traffic_state == 0) draw_player_sprite(x, y, walk_frame, facing);
     }
 }

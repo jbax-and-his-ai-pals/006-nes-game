@@ -3,6 +3,7 @@
 #include "v2_scene_avenue.h"
 #include "v2_scene_bar.h"
 #include "v2_scene_casino.h"
+#include "v2_scene_commentarium.h"
 #include "v2_scene_mart.h"
 #include "v2_scene_park.h"
 #include "v2_scene_sewer.h"
@@ -11,6 +12,7 @@
 extern volatile unsigned char banked_scene_arg;
 #include "mmc3.h"
 #include "music.h"
+#include "v2_dialogue.h"
 #include "v2_inventory.h"
 #include "v2_player_actor.h"
 #include "v2_regulars.h"
@@ -50,10 +52,11 @@ static void keep_scene_api(void)
     draw_text(0, 0, "");
     draw_storefront_sign();
     draw_storefront_window(0, 0);
-    draw_player_sprite(0, 0, 0);
+    draw_player_sprite(0, 0, 0, 0);
     hide_player_sprite();
     reset_park_regulars();
     update_park_regulars();
+    (void)park_regular_is_near(0, 0, 0);
     reset_piss_corner_regulars();
     update_piss_corner_regulars();
     draw_regulars();
@@ -62,6 +65,9 @@ static void keep_scene_api(void)
     hide_taxi_sprite();
     draw_traffic_particles(0, 0);
     draw_crash_tableau(0, 0);
+    set_traffic_crash_oam_base(48);
+    dialogue_set_palette(3);
+    (void)dialogue_get_palette();
     show_traffic_death();
     show_traffic_death_message("", "");
     vram_queue_clear();
@@ -91,3 +97,4 @@ void run_mart_interior(void) { banked_scene_arg = 2; mmc3_select_prg_pair(9); mm
 unsigned char run_park(void) { mmc3_select_prg_pair(3); return mmc3_call_mapped_scene(); }
 unsigned char run_sewer(void) { mmc3_select_prg_pair(11); return mmc3_call_mapped_scene(); }
 unsigned char run_zoo(void) { mmc3_select_prg_pair(15); return mmc3_call_mapped_scene(); }
+void run_commentarium(void) { mmc3_select_prg_pair(17); mmc3_call_mapped_scene(); }

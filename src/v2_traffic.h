@@ -7,6 +7,8 @@ void draw_taxi_sprite(int x, unsigned char moving_left);
 void hide_taxi_sprite(void);
 void draw_traffic_particles(unsigned char x, unsigned char moving_left);
 void draw_crash_tableau(unsigned char x, unsigned char moving_left);
+/* Temporarily relocate the shared 15-sprite crash presentation. */
+void set_traffic_crash_oam_base(unsigned char first_slot);
 void show_traffic_death(void);
 void show_traffic_death_message(const char *line1, const char *line2);
 

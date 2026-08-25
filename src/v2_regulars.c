@@ -72,6 +72,16 @@ void update_park_regulars(void)
     update_regular(&two_x, &two_y, &two_timer, &two_steps, &two_direction, &two_facing_up, 160, 208, 136, 184);
 }
 
+unsigned char park_regular_is_near(unsigned char regular, unsigned char x,
+                                   unsigned char y)
+{
+    unsigned char regular_x = regular ? two_x : one_x;
+    unsigned char regular_y = regular ? two_y : one_y;
+
+    return x >= regular_x - 12 && x <= regular_x + 20 &&
+           y >= regular_y - 12 && y <= regular_y + 24;
+}
+
 static void draw_regular(unsigned char slot, unsigned char face_slot, unsigned char x,
                          unsigned char y, unsigned char facing_up, unsigned char mirrored)
 {

@@ -12,7 +12,8 @@ typedef enum {
     V2_SCENE_SEWER,
     V2_SCENE_PARK,
     V2_SCENE_CASINO,
-    V2_SCENE_ZOO
+    V2_SCENE_ZOO,
+    V2_SCENE_COMMENTARIUM
 } V2SceneId;
 
 typedef struct {
@@ -37,6 +38,10 @@ typedef struct {
     unsigned char zoo_gate_open;
     unsigned char has_zoo_map;
     unsigned char jimbles_x;
+    /* Dedicated pixel coordinate for a scene-to-scene side passage. This is
+     * intentionally separate from route.spawn, which the dispatcher owns. */
+    unsigned char transfer_y;
+    unsigned char transfer_y_valid;
     V2SceneRoute route;
     CasinoState casino;
 } V2GameState;

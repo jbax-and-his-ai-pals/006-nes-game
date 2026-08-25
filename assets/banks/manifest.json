@@ -41,6 +41,11 @@
       "source": "build/scene_zoo_real.bin"
     },
     {
+      "kind": "prg",
+      "banks": [17, 18],
+      "source": "build/scene_commentarium_real.bin"
+    },
+    {
       "kind": "chr",
       "bank": 2,
       "source": "@common_chr"

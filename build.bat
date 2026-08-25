@@ -20,6 +20,8 @@ call "%~dp0build_scene_casino.bat"
 if errorlevel 1 exit /b 1
 call "%~dp0build_scene_zoo.bat"
 if errorlevel 1 exit /b 1
+call "%~dp0build_scene_commentarium.bat"
+if errorlevel 1 exit /b 1
 
 python tools\pack_mmc3.py build\fixed_engine.nes game.nes
 if errorlevel 1 exit /b 1

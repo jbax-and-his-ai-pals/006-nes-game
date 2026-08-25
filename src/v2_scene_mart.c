@@ -52,8 +52,8 @@ static void show_mart_exterior(void)
          * index 1 the same gray as the cinder block, leaving only the
          * glass itself blue instead of creating blue masonry artifacts. */
         0x0F, 0x00, 0x21, 0x30,
-        0x0F, 0x16, 0x0F, 0x0F, 0x0F, 0x30, 0x27, 0x16,
-        0x0F, 0x16, 0x06, 0x30, 0x0F, 0x0F, 0x28, 0x30
+        0x0F, 0x16, 0x0F, 0x0F, 0x0F, 0x0F, 0x27, 0x30,
+        0x0F, 0x16, 0x28, 0x30, 0x0F, 0x0F, 0x0F, 0x30
     };
     unsigned char i;
 
@@ -117,6 +117,7 @@ unsigned char run_mart_exterior(unsigned char from_mart)
     unsigned char y = from_mart ? 196 : 200;
     unsigned char walk_frame = 0;
     unsigned char walk_timer = 0;
+    unsigned char facing = PLAYER_FACING_DOWN;
     unsigned char pad;
     unsigned char traffic_state = 0;
     unsigned char taxi_moving_left = 0;
@@ -131,6 +132,10 @@ unsigned char run_mart_exterior(unsigned char from_mart)
         reset_scroll();
         oam_flush();
         pad = read_pad();
+        if (pad & PAD_UP) facing = PLAYER_FACING_UP;
+        else if (pad & PAD_DOWN) facing = PLAYER_FACING_DOWN;
+        else if (pad & PAD_LEFT) facing = PLAYER_FACING_LEFT;
+        else if (pad & PAD_RIGHT) facing = PLAYER_FACING_RIGHT;
         if (traffic_state == 0) {
             if (pad & PAD_START) {
                 run_inventory();
@@ -163,7 +168,7 @@ unsigned char run_mart_exterior(unsigned char from_mart)
                 taxi_moving_left = x < 128;
                 taxi_x = taxi_moving_left ? 224 : 0;
             }
-            draw_player_sprite(x, y, walk_frame);
+            draw_player_sprite(x, y, walk_frame, facing);
         } else if (traffic_state == 1 || traffic_state == 2) {
             taxi_x += taxi_moving_left ? -3 : 3;
             if (taxi_x > -32 && taxi_x < 256) draw_taxi_sprite(taxi_x, taxi_moving_left);
@@ -209,8 +214,8 @@ static void show_mart_interior(void)
          * it never changes color while palette 1 is repainted for dialogue. */
         0x0F, 0x00, 0x10, 0x30,
         0x0F, 0x0F, 0x0F, 0x0F,
-        0x0F, 0x16, 0x0F, 0x0F, 0x0F, 0x28, 0x21, 0x30,
-        0x0F, 0x16, 0x06, 0x30, 0x0F, 0x0F, 0x0F, 0x0F
+        0x0F, 0x16, 0x0F, 0x0F, 0x0F, 0x0F, 0x27, 0x30,
+        0x0F, 0x16, 0x06, 0x30, 0x0F, 0x0F, 0x0F, 0x30
     };
     unsigned char i;
 
@@ -285,6 +290,7 @@ void run_mart_interior(void)
     unsigned char y = 200;
     unsigned char walk_frame = 0;
     unsigned char walk_timer = 0;
+    unsigned char facing = PLAYER_FACING_DOWN;
     unsigned char pad;
     unsigned char cashier_prompted = 0;
     unsigned char register_prompted = 0;
@@ -299,6 +305,10 @@ void run_mart_interior(void)
         reset_scroll();
         oam_flush();
         pad = read_pad();
+        if (pad & PAD_UP) facing = PLAYER_FACING_UP;
+        else if (pad & PAD_DOWN) facing = PLAYER_FACING_DOWN;
+        else if (pad & PAD_LEFT) facing = PLAYER_FACING_LEFT;
+        else if (pad & PAD_RIGHT) facing = PLAYER_FACING_RIGHT;
         if (pad & PAD_START) {
             run_inventory();
             show_mart_interior();
@@ -384,7 +394,7 @@ void run_mart_interior(void)
         } else {
             shelf_prompted = 0;
         }
-        draw_player_sprite(x, y, walk_frame);
+        draw_player_sprite(x, y, walk_frame, facing);
     }
 }
 
@@ -394,6 +404,9 @@ void run_mart_interior(void)
  * restores the room palette immediately after dismissal. */
 static void show_mart_message(const char *line1, const char *line2, const char *line3)
 {
+    /* Palette selection persists across scene transitions. Keep dialogue on
+     * the mart's reserved palette 1, never the storefront sign's palette 2. */
+    dialogue_set_palette(1);
     PPU.mask = 0;
     PPU.vram.address = 0x3F;
     PPU.vram.address = 0x04;

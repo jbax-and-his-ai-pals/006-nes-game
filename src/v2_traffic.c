@@ -1,5 +1,6 @@
 #include <nes.h>
 
+#include "v2_dialogue.h"
 #include "v2_runtime.h"
 #include "v2_scene_ui.h"
 #include "v2_traffic.h"
@@ -17,6 +18,8 @@
 #define TRAFFIC_BONE_TILE_BASE 249
 #define PARTICLE_OAM_BASE 48
 
+static unsigned char traffic_crash_oam_base = PARTICLE_OAM_BASE;
+
 static void set_oam_sprite_offset(unsigned char slot, unsigned char x, int dx,
                                   unsigned char y, unsigned char tile,
                                   unsigned char attr)
@@ -30,44 +33,54 @@ static void set_oam_sprite_offset(unsigned char slot, unsigned char x, int dx,
 void draw_traffic_particles(unsigned char x, unsigned char moving_left)
 {
     int direction = moving_left ? -1 : 1;
+    unsigned char base = traffic_crash_oam_base;
 
-    set_oam_sprite_offset(PARTICLE_OAM_BASE, x, direction * 8, 220, TAXI_PARTICLE_TILE, 2);
-    set_oam_sprite_offset(PARTICLE_OAM_BASE + 1, x, direction * 24, 216, TAXI_PARTICLE_SMALL_TILE, 2);
-    set_oam_sprite_offset(PARTICLE_OAM_BASE + 2, x, direction * 38, 228, TAXI_PARTICLE_DOT_TILE, 2);
-    set_oam_sprite_offset(59, x, direction * 52, 212, TAXI_PARTICLE_SMALL_TILE, 2);
-    set_oam_sprite_offset(60, x, direction * 66, 222, TAXI_PARTICLE_DOT_TILE, 2);
-    set_oam_sprite_offset(61, x, direction * 80, 230, TAXI_PARTICLE_SMALL_TILE, 2);
-    set_oam_sprite_offset(62, x, direction * 92, 218, TAXI_PARTICLE_DOT_TILE, 2);
+    set_oam_sprite_offset(base, x, direction * 8, 220, TAXI_PARTICLE_TILE, 2);
+    set_oam_sprite_offset(base + 1, x, direction * 24, 216, TAXI_PARTICLE_SMALL_TILE, 2);
+    set_oam_sprite_offset(base + 2, x, direction * 38, 228, TAXI_PARTICLE_DOT_TILE, 2);
+    set_oam_sprite_offset(base + 11, x, direction * 52, 212, TAXI_PARTICLE_SMALL_TILE, 2);
+    set_oam_sprite_offset(base + 12, x, direction * 66, 222, TAXI_PARTICLE_DOT_TILE, 2);
+    set_oam_sprite_offset(base + 13, x, direction * 80, 230, TAXI_PARTICLE_SMALL_TILE, 2);
+    set_oam_sprite_offset(base + 14, x, direction * 92, 218, TAXI_PARTICLE_DOT_TILE, 2);
 }
 
 void draw_crash_tableau(unsigned char x, unsigned char moving_left)
 {
+    unsigned char base = traffic_crash_oam_base + 3;
+
     if (moving_left) {
-        set_oam_sprite_offset(51, x, -66, 220, TRAFFIC_BONE_TILE_BASE, 3);
-        set_oam_sprite_offset(52, x, -58, 220, TRAFFIC_BONE_TILE_BASE + 1, 3);
-        set_oam_sprite_offset(53, x, -18, 216, TRAFFIC_BONE_TILE_BASE + 2, 3);
-        set_oam_sprite_offset(54, x, -38, 228, TRAFFIC_BONE_TILE_BASE + 3, 3);
-        set_oam_sprite_offset(55, x, -8, 224, TRAFFIC_BONE_TILE_BASE + 4, 3);
-        set_oam_sprite_offset(56, x, -45, 210, TRAFFIC_BONE_TILE_BASE + 5, 3);
-        set_oam_sprite_offset(57, x, -34, 208, PLAYER_TILE_BASE, 1);
-        set_oam_sprite_offset(58, x, -26, 208, PLAYER_TILE_BASE + 1, 1);
+        set_oam_sprite_offset(base, x, -66, 220, TRAFFIC_BONE_TILE_BASE, 3);
+        set_oam_sprite_offset(base + 1, x, -58, 220, TRAFFIC_BONE_TILE_BASE + 1, 3);
+        set_oam_sprite_offset(base + 2, x, -18, 216, TRAFFIC_BONE_TILE_BASE + 2, 3);
+        set_oam_sprite_offset(base + 3, x, -38, 228, TRAFFIC_BONE_TILE_BASE + 3, 3);
+        set_oam_sprite_offset(base + 4, x, -8, 224, TRAFFIC_BONE_TILE_BASE + 4, 3);
+        set_oam_sprite_offset(base + 5, x, -45, 210, TRAFFIC_BONE_TILE_BASE + 5, 3);
+        set_oam_sprite_offset(base + 6, x, -34, 208, PLAYER_TILE_BASE, 1);
+        set_oam_sprite_offset(base + 7, x, -26, 208, PLAYER_TILE_BASE + 1, 1);
     } else {
-        set_oam_sprite_offset(51, x, 34, 220, TRAFFIC_BONE_TILE_BASE, 3);
-        set_oam_sprite_offset(52, x, 42, 220, TRAFFIC_BONE_TILE_BASE + 1, 3);
-        set_oam_sprite_offset(53, x, 70, 216, TRAFFIC_BONE_TILE_BASE + 2, 3);
-        set_oam_sprite_offset(54, x, 46, 228, TRAFFIC_BONE_TILE_BASE + 3, 3);
-        set_oam_sprite_offset(55, x, 76, 224, TRAFFIC_BONE_TILE_BASE + 4, 3);
-        set_oam_sprite_offset(56, x, 30, 210, TRAFFIC_BONE_TILE_BASE + 5, 3);
-        set_oam_sprite_offset(57, x, 50, 208, PLAYER_TILE_BASE, 1);
-        set_oam_sprite_offset(58, x, 58, 208, PLAYER_TILE_BASE + 1, 1);
+        set_oam_sprite_offset(base, x, 34, 220, TRAFFIC_BONE_TILE_BASE, 3);
+        set_oam_sprite_offset(base + 1, x, 42, 220, TRAFFIC_BONE_TILE_BASE + 1, 3);
+        set_oam_sprite_offset(base + 2, x, 70, 216, TRAFFIC_BONE_TILE_BASE + 2, 3);
+        set_oam_sprite_offset(base + 3, x, 46, 228, TRAFFIC_BONE_TILE_BASE + 3, 3);
+        set_oam_sprite_offset(base + 4, x, 76, 224, TRAFFIC_BONE_TILE_BASE + 4, 3);
+        set_oam_sprite_offset(base + 5, x, 30, 210, TRAFFIC_BONE_TILE_BASE + 5, 3);
+        set_oam_sprite_offset(base + 6, x, 50, 208, PLAYER_TILE_BASE, 1);
+        set_oam_sprite_offset(base + 7, x, 58, 208, PLAYER_TILE_BASE + 1, 1);
     }
+}
+
+void set_traffic_crash_oam_base(unsigned char first_slot)
+{
+    traffic_crash_oam_base = first_slot;
 }
 
 void draw_taxi_sprite(int x, unsigned char moving_left)
 {
     unsigned char row, col;
     unsigned char slot = 32;
-    unsigned char attr = moving_left ? 3 : 0x43;
+    /* Sprite palette 2 carries the cab's yellow body, red accents, and
+     * white checker stripe. Palette 3 is reserved for bones/crash art. */
+    unsigned char attr = moving_left ? 2 : 0x42;
     unsigned char base_y = 190;
 
     for (row = 0; row < 3; ++row) {
@@ -104,18 +117,19 @@ static unsigned char centered_text_col(const char *text)
 void show_traffic_death_message(const char *line1, const char *line2)
 {
     unsigned char i;
+    unsigned char palette = dialogue_get_palette();
 
     PPU.mask = 0;
-    /* Palette 3 only draws window areas, all covered by this aligned plate. */
+    /* The active dialogue palette only draws inside this aligned plate. */
     PPU.vram.address = 0x3F;
-    PPU.vram.address = 0x0C;
+    PPU.vram.address = (unsigned char)(palette << 2);
     PPU.vram.data = 0x0F;
     PPU.vram.data = 0x2A;
     PPU.vram.data = 0x01;
     PPU.vram.data = 0x30;
     draw_title_plate(12, 4, 24, 8);
-    for (i = 1; i < 7; ++i) set_attribute_block(3, i, 3);
-    for (i = 1; i < 7; ++i) set_attribute_block(4, i, 3);
+    for (i = 1; i < 7; ++i) set_attribute_block(3, i, palette);
+    for (i = 1; i < 7; ++i) set_attribute_block(4, i, palette);
     draw_text(14, centered_text_col(line1), line1);
     draw_text(16, centered_text_col(line2), line2);
     reset_scroll();
