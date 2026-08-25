@@ -13,7 +13,7 @@ fixed-camera NES scenes connected by explicit routes.
        |                     |                  ^
        +------------- [ Neon Avenue ] ---- closed public gate
                             |       \
-                    [ All-Nite Mart ] [ Jimbles's Bar ]
+                    [ All-Nite Mart ] [ Jimbles's Bar ] -- [ The Commentarium ]
                                               |
                             [ Wrecked 'Em Casino ]
                                               |
@@ -32,8 +32,9 @@ fixed-camera NES scenes connected by explicit routes.
 | Location | Surface connection | Current purpose |
 | --- | --- | --- |
 | Neon Avenue | Central hub | Connects the Bar, Mart, Park, and sewer. |
-| Jimbles's Bar | East/center Avenue entrance | Tavern hub, Piss Corner, and casino backroom door. |
-| Wrecked 'Em Casino | Bar backroom door | Slots, blackjack, poker, and a return to the Bar. |
+| Jimbles's Bar | East/center Avenue entrance | Tavern hub, Piss Corner, casino backroom door, and a side door to the Commentarium. |
+| Wrecked 'Em Casino | Bar backroom door | Slots, blackjack, video poker, roulette, and a return to the Bar. |
+| The Commentarium | Bar side door | A stage performer and a rotating feed of comedic "dumb comments" from the audience. |
 | All-Nite Mart | West Avenue exit | Convenience-store exterior/interior and early item pickup. |
 | Moonlight Park | East Avenue exit | Fountain, wandering NPCs, and a service-hatch route toward the Zoo. |
 | Sewer Network | Avenue manhole | First underground route; its dry-tunnel east exit now reaches the Zoo service hatch. |

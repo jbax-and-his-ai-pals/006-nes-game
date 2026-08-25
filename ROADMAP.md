@@ -3,18 +3,16 @@
 ## New Direction
 
 The finished exploration-combat prototype is archived under `archive/`. The
-active project is now an original, comedic graphic adventure for NES hardware:
+active project is an original, comedic graphic adventure for NES hardware:
 small authored scenes, strong environmental storytelling, item puzzles, and
-short comic conversations rather than real-time combat. Scenes should read as
+short comic conversations rather than real-time combat. Scenes read as
 fixed-camera adventure tableaux: a side-on facade or landscape with an actor
 walking through it, not a scrolling overworld or a dense top-down tile field.
 
 The first `Leisure Suit Larry` provides only a useful venue rhythm: a bar,
-hotel-casino, chapel, dance club, and late-night shop make a compact town feel
-like a complete night out. Our setting, characters, names, art, dialogue, and
-puzzles will be wholly original. The intended player experience is closer to a
-King's Quest-style adventure: observe, collect, combine, talk, and try odd
-solutions.
+casino, and late-night shop make a compact town feel like a complete night
+out. Our setting, characters, names, art, dialogue, and puzzles are wholly
+original.
 
 ## Experience Pillars
 
@@ -28,152 +26,113 @@ solutions.
 4. **Original characters and stakes.** The goal, protagonist, and every puzzle
    belong to this game, not to its inspirations.
 
+## Interaction Model (as actually built)
+
+An earlier draft of this document planned a cursor-and-verb-strip point-and-
+click interface (Look/Use/Talk/Take, an icon inventory grid). That was never
+built; what shipped instead, and is the real interaction model going forward:
+
+- The player walks with the d-pad in every scene; there is no cursor.
+- A pressed at a hotspot (an NPC, a machine, a door, a pickup) triggers that
+  spot's one contextual action directly -- talk, enter a full-screen game,
+  open a door, or collect an item. There is no separate verb selection step.
+- START opens a text-list inventory (`src/v2_inventory.c`) of held items with
+  short descriptions; there is no icon grid and no item-on-item/item-on-
+  hotspot combination system yet (see Content Roadmap below).
+- Dialogue is a typed, three-line message-box overlay (`src/v2_dialogue.c`),
+  not a paged branching-choice panel.
+- A location with its own real game (casino tables, the Commentarium's stage)
+  gets its own full-screen presentation entered from the walkable room, not
+  an in-room modal.
+
 ## Town Blueprint
 
-| Working destination | Scene role | Puzzle energy |
+| Location | Status | Scene role |
 | --- | --- | --- |
-| **Jimbles's Bar** | Starting tavern and rumor hub | Meet the bartender, find the first lead, learn the town's rules. |
-| **Starlight Lodge & Lucky Wheel** | Hotel lobby, casino floor, upper corridor | Trade information, spot a rigged game, reach a restricted room. |
-| **Moonbeam Chapel** | Quiet chapel with an overworked officiant | A ceremonial prop and a social puzzle, not a romance parody. |
-| **The Comet Room** | Dance club and stage | Music, lighting, and a performance-based access puzzle. |
-| **All-Nite Mart** | Convenience shop full of tiny usable objects | Inventory combinations, purchases, and comic inspections. |
-| **Neon Avenue** | Exterior connector and taxi-stop view | Establish the night, gate destinations, and show progress visually. |
-| **Piss Corner** | Lower-right nook inside Jimbles's Bar | Jimbles banishes rowdy regulars here; evolving barks and a later clue. |
-| **Moonlight Park** | Small after-hours city park | Environmental observation, fountain/light puzzles, and meetings. |
-| **Galaxy Lanes & Arcade** | Public bowling and arcade venue | Token economy, a pattern minigame, and a social clue hub. |
-| **Slug Acres** | Eccentric suburban slug farm | Creature-care comedy and a specialty puzzle resource. |
-| **Pocket Zoo** | Compact municipal zoo | Animal-behavior puzzle and keeper interactions. |
-| **Municipal Research Annex** | Late-game laboratory | Evidence/item combination and the town-mystery reveal. |
+| Neon Avenue | Built | Central hub; taxi death loop; gates every other surface destination. |
+| Jimbles's Bar | Built | Tavern hub, jukebox/token puzzle, Piss Corner, casino and Commentarium doors. |
+| Wrecked 'Em Casino | Built | Slots (wild BAR), blackjack (naturals), video poker (single-deck), roulette. |
+| The Commentarium | Built | Stage performer and a rotating feed of comedic "dumb comments." |
+| All-Nite Mart | Built | Convenience-store exterior/interior, shelf/cashier interactions, paper-clip pickup. |
+| Sewer Network | Built | Underground shortcut layer connecting the Avenue, Park, and Zoo. |
+| Moonlight Park | Built | Dry fountain, wandering patrons, service-hatch route to the Zoo. |
+| Pocket Zoo | Built | Slug infestation, Keeper Nibs, the Zoo Map, pond/reptile exhibits. |
+| Moonbeam Chapel | Planned | Quiet chapel with an overworked officiant; a ceremonial prop and a social puzzle. |
+| Slug Acres | Planned | Eccentric suburban slug farm; creature-care comedy and a specialty puzzle resource. |
+| Starlight Lodge | Planned | Hotel lobby and upper corridor, reached south from the Bar/Casino; trade info, reach a restricted room. |
+| Galaxy Lanes & Arcade | Planned | Public bowling/arcade venue; token economy, a pattern minigame, social clue hub. |
+| Municipal Research Annex | Planned | Late-game laboratory; evidence/item combination and the town-mystery reveal. |
 
-## Interaction Model
+See `WORLD_MAP.md` for the geography these connect through (including the
+sewer's routing) and the expansion order for the still-planned destinations.
 
-- D-pad moves a cursor between hotspots; A selects.
-- A compact verb strip offers **Look**, **Use**, **Talk**, and **Take** when
-  applicable. B cancels or backs out.
-- Inventory is an item grid, not a modal text list. Selecting an item then a
-  hotspot attempts an item-specific action.
-- A bottom dialogue panel supports short lines, choices, and action feedback.
-- Every hotspot has a default `Look` response, including scenery.
+## Content Roadmap
 
-## Milestones
+The engine questions this document used to track in detail -- PRG/CHR
+banking, the fixed-engine/scene-module split, the NMI VRAM queue -- are done
+and described in `CURRENT_ARCHITECTURE.md`, which is the authoritative
+reference for how the runtime actually works today. What's still open is
+content and design work:
 
-### Phase 0: Preserve and Reframe
+### Foundation (done)
 
 - [x] Archive the completed exploration-combat NES prototype and its roadmap.
-- [ ] Replace the title-screen taunts with adventure-specific presentation.
-- [ ] Write a one-page premise: protagonist, immediate objective, town secret,
-  and ending condition.
-- [ ] Decide whether the player avatar appears continuously in scenes or only
-  in cutaway/action moments.
+- [x] Eight playable locations (see Town Blueprint) with authored collision,
+  door transitions, and street traffic death traps.
+- [x] A modal, text-list inventory tracking six items with no puzzle-critical
+  item currently losable.
+- [x] Casino sharing one credit balance across four working games.
+- [x] Fixed route/spawn state for scene transitions (`ROUTING.md`).
 
-### Phase 0.5: Cartridge Architecture
+### Puzzles and progression (open)
 
-- [x] Confirm the active build is mapper-4 MMC3: 512 KiB PRG-ROM plus 256 KiB
-  CHR-ROM, with a 32 KiB CPU-visible runtime window awaiting scene banking.
-- [ ] Split the common runtime (startup, NMI, controller, OAM, text, and
-  bank-switch trampolines) from scene-specific code and data.
-- [x] Add an MMC3 mapper-4 build target with 512 KiB PRG-ROM and 256 KiB
-  CHR-ROM; keep the reset/vector bootstrap in the fixed bank.
-- [x] Add a mapped-runtime budget guard and an active bank manifest; casino-owned
-  data now occupies PRG bank 2 and the Park module occupies banks 3-4; banks
-  5-61 remain available.
-- [x] Establish a common CHR bank for font, HUD, player, and title art, then
-  load scene-specific CHR banks on scene entry. Moonlight Park now selects
-  CHR bank 2, initially as a stable common-graphics clone.
-- [ ] Move each polished scene's art, dialogue, hotspots, and music data into
-  named banks, with a small bank manifest and size budget report.
-
-### Phase 1: Adventure Runtime
-
-- [ ] Define `Scene`, `Hotspot`, `Item`, `Character`, and `Action` data types.
-- [x] Replace the opening room's decoration-heavy tile interpretation with a
-  direct, fixed-camera Neon Avenue tableau; scene art and collision are now
-  free to evolve independently.
-- [ ] Move opening-scene collision into explicit walkable bounds and hotspot
-  rectangles, rather than inheriting the legacy top-down room grid.
-- [ ] Build cursor movement, hotspot focus feedback, and the four-verb strip.
-- [ ] Add a dialogue/action-result box that can render short paged text.
-- [ ] Replace combat input with inspect/take/use/talk dispatch.
-- [ ] Add deterministic game flags and a debug scene/item state display.
-- [x] Add fixed route/spawn state for scene transitions; see `ROUTING.md`.
-- [ ] Add a compact scene registry and data-driven exit routes before adding
-  more than two new destinations.
-
-### Phase 2: Inventory and Puzzle Safety
-
-- [x] Implement a modal inventory list with selection and item descriptions;
-  it currently tracks the paper clip, Jimbles's beer, jukebox token, sewer
-  key, and temporary flamethrower pickup.
-- [ ] Support item-on-hotspot and item-on-item actions.
-- [ ] Add puzzle prerequisites, state transitions, and alternate hint text.
-- [ ] Ensure no puzzle-critical item can be consumed, sold, or discarded into
-  an unwinnable state.
-- [ ] Write data-driven smoke tests for puzzle progression and failure paths.
-- [ ] Replace per-item state fields with an item catalog and ownership bitset
-  before the inventory grows beyond the current starter items.
-- [ ] Add reusable hotspot/action and event-result records before building the
-  first multi-scene puzzle.
-
-### Phase 3: Vertical Slice
-
-- [x] Build the first fixed-camera Neon Avenue pass: a night street, `BENT
-  COIN` and `ALL NITE` facades, a taxi post, a welcoming resident, and no
-  opening-room combat encounter.
-- [x] Build the first Jimbles's Bar puzzle loop: collect a jukebox token,
-  receive bartender guidance, activate the jukebox, and visibly unlock the
-  back-room door. Activation plays Jimbles's one-shot theme, pauses, then
-  resumes the normal loop; the door is currently a narrative hook, not a
-  scene change.
-- [x] Build Neon Avenue, Jimbles's Bar, and All-Nite Mart as connected,
-  playable scenes with authored collision, door transitions, and street
-  traffic death traps.
-- [x] Expand the sewer into ladder shaft, flow junction, and dry-tunnel rooms;
-  the tunnel contains a persistent sewer key with no puzzle dependency yet.
-- [x] Turn Wrecked 'Em Casino into three working games sharing one credit
-  balance: slots, blackjack, and video poker.
-- [ ] Ship one three-step puzzle spanning all three scenes.
+- [ ] Ship one puzzle spanning multiple scenes (an item found in one location
+  needed in another), not just a single-room pickup.
+- [ ] Support item-on-hotspot and item-on-item actions -- the inventory has
+  no interaction verb yet beyond holding/inspecting.
+- [ ] Add puzzle prerequisites, state transitions, and alternate hint text
+  for at least one multi-step puzzle.
 - [ ] Add one conversation with a choice that changes flavor text or a clue,
   without branching the critical path.
-- [ ] Add scene-specific music loops and at least four interaction sounds.
-- [ ] Playtest from a clean boot to the slice ending without developer tools.
+- [ ] Write data-driven smoke tests for puzzle progression and failure paths,
+  matching the existing pure-C test coverage for casino/quest/world logic.
 
-### Phase 4: The Night Town
+### Town expansion (open)
 
-- [ ] Add Starlight Lodge & Lucky Wheel, Moonbeam Chapel, and The Comet Room.
-- [x] Add Moonlight Park as an eastward Neon Avenue destination, with a dry
-  fountain, paths, benches, and a distinct green night palette.
-- [ ] Add Galaxy Lanes & Arcade, Slug Acres, Pocket Zoo, and the Municipal
-  Research Annex in the dependency order in `REBUILD_ROADMAP.md`.
-- [ ] Give every destination one signature mechanic: observation, social
-  exchange, ritual, performance, or inventory comedy.
-- [ ] Build a taxi/street transition map that reveals unlocked destinations.
-- [ ] Author repeatable NPC barks that evolve with major story flags.
+- [ ] Build the next destination from `WORLD_MAP.md`'s expansion order
+  (Moonbeam Chapel is next, off Moonlight Park's north exit).
+- [ ] Give every new destination one signature mechanic: observation, social
+  exchange, ritual, performance, or inventory comedy -- not a reskin of an
+  existing minigame.
+- [ ] Playtest the Zoo and Commentarium end to end from a clean boot with the
+  same scrutiny already applied to the six earlier locations.
 
-### Phase 5: Narrative and Presentation Pass
+### Narrative and presentation (open)
 
+- [ ] Write a one-page premise: protagonist, immediate objective, town
+  secret, and ending condition. Still undecided.
 - [ ] Write the complete critical path, optional jokes, and a hint ladder.
-- [ ] Replace placeholders with a cohesive neon-noir palette and scene art.
+- [ ] Rework the title portrait into an intentional host/narrator, or decide
+  it doesn't need one.
+- [ ] Add scene-specific music loops and interaction sounds beyond what
+  currently exists.
 - [ ] Add transitions, cutaways, and a concise ending sequence.
-- [ ] Rework the title portrait into an intentional host/narrator or remove it
-  if it no longer serves the new tone.
 
-### Phase 6: Shipping Discipline
+### Shipping discipline (open)
 
-- [ ] Add a fresh-save completion checklist and a no-dead-end regression pass.
-- [ ] Verify all text fits the NES font/dialogue constraints.
-- [ ] Verify scene changes, dialogue, music, and inventory updates remain
-  vblank-safe.
+- [ ] Add a fresh-save completion checklist and a no-dead-end regression
+  pass once a critical path exists to regress against.
+- [ ] Verify all text fits the NES font/dialogue constraints across every
+  scene, not just the ones under active development.
 - [ ] Package ROM, controls, attribution, and playtest notes.
 
 ## Immediate Next Steps
 
-1. Playtest the new sewer exits, casino controls, and park transition in Mesen;
-   tune collision halos and text only from observed behavior.
-2. Continue extracting the handwritten scene loops from
-   `src/v2_title_main.c` into the reusable scene/hotspot layer. Generic
-   tile/text/attribute writes, dialogue, input debounce, and inventory now
-   live in dedicated shared modules.
-3. Add a second public venue, preferably Galaxy Lanes & Arcade, with one
-   self-contained game and a non-critical collectible.
-4. Make the inventory visual rather than text-only by assigning icons from a
-   future scene-aware CHR bank, then design the first larger puzzle mechanic.
+1. Decide the one-page premise (protagonist, objective, town secret, ending)
+   -- most open content work depends on knowing what the critical path is.
+2. Playtest Zoo and Commentarium from a clean boot; fix anything that only
+   shows up in real play, the same way earlier locations were hardened.
+3. Build Moonbeam Chapel (`WORLD_MAP.md`'s next expansion step) as the first
+   destination designed against a real, if still one-page, premise.
+4. Once a premise exists, design the first puzzle that genuinely spans two
+   or more scenes, and add the item-on-hotspot interaction it needs.

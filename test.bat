@@ -3,8 +3,11 @@ setlocal enabledelayedexpansion
 
 set CC65_HOME=C:\tools\cc65
 set PATH=%CC65_HOME%\bin;%PATH%
-
+REM See build_fixed_engine.bat's comment: keeps cl65's scratch objects out
+REM of the project root if TEMP/TMP would otherwise resolve badly.
 if not exist tests\out mkdir tests\out
+set TEMP=%~dp0tests\out
+set TMP=%~dp0tests\out
 
 set FAILED=0
 

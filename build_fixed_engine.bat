@@ -3,6 +3,14 @@ setlocal
 
 set CC65_HOME=C:\tools\cc65
 set PATH=%CC65_HOME%\bin;%PATH%
+REM cl65 drops per-file scratch objects wherever TEMP/TMP resolve to; if
+REM either is unset or unwritable in the calling environment it silently
+REM falls back to the current directory, littering the project root with
+REM PID-named *.o files. Pointing both at a dedicated, gitignored folder
+REM keeps that fallback contained no matter what shell invokes this script.
+if not exist build\tmp mkdir build\tmp
+set TEMP=%~dp0build\tmp
+set TMP=%~dp0build\tmp
 
 if not exist build mkdir build
 

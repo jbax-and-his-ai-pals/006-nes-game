@@ -49,6 +49,13 @@
 #define casino_bet game_state.casino.bet
 #define casino_reel game_state.casino.reel
 
+/* Shared between two or more games below, each of which used to carry its
+ * own copy of the identical literal -- this scene's own PRG bank is tight
+ * enough that the duplication was a real cost, not just tidiness. */
+static const char poker_title[] = "POKER";
+static const char you_win_text[] = "YOU WIN +";
+static const char lr_bet_text[] = "L R: BET";
+
 /* Defined below (shared header/clear-screen helper for all three games);
  * forward-declared so show_slots_screen() can call it despite coming
  * first in the file. */
@@ -62,26 +69,37 @@ static void draw_payout_row(unsigned char row, const char *name, unsigned char m
  * and spans the same three middle columns instead. Every symbol's
  * footprint is a subset of those three columns, so redrawing them
  * unconditionally always fully overwrites whatever was showing there
- * before -- no separate clear pass needed. */
+ * before -- no separate clear pass needed. Shared by draw_slot_symbol()
+ * and queue_slot_symbol() below, which used to each carry their own copy
+ * of this switch -- one for immediate set_tile(), one for queued
+ * vram_queue_tile() -- this scene's own PRG bank is tight enough that the
+ * duplicated logic was a real cost. */
+static void slot_symbol_tiles(unsigned char symbol, unsigned char *tiles)
+{
+    switch (symbol) {
+        case CASINO_SYMBOL_SEVEN:
+            tiles[0] = FONT_TILE_BASE; tiles[1] = CARD_SLOT_SEVEN; tiles[2] = FONT_TILE_BASE;
+            break;
+        case CASINO_SYMBOL_CHERRY:
+            tiles[0] = FONT_TILE_BASE; tiles[1] = CARD_SLOT_CHERRY; tiles[2] = FONT_TILE_BASE;
+            break;
+        default:
+            tiles[0] = (unsigned char)(FONT_TILE_BASE + font_glyph_index('B'));
+            tiles[1] = (unsigned char)(FONT_TILE_BASE + font_glyph_index('A'));
+            tiles[2] = (unsigned char)(FONT_TILE_BASE + font_glyph_index('R'));
+            break;
+    }
+}
+
 static void draw_slot_symbol(unsigned char row, unsigned char left_col, unsigned char symbol)
 {
     unsigned char mid = (unsigned char)(left_col + 4);
+    unsigned char tiles[3];
 
-    switch (symbol) {
-        case CASINO_SYMBOL_SEVEN:
-            set_tile(row, (unsigned char)(mid - 1), FONT_TILE_BASE);
-            set_tile(row, mid, CARD_SLOT_SEVEN);
-            set_tile(row, (unsigned char)(mid + 1), FONT_TILE_BASE);
-            break;
-        case CASINO_SYMBOL_CHERRY:
-            set_tile(row, (unsigned char)(mid - 1), FONT_TILE_BASE);
-            set_tile(row, mid, CARD_SLOT_CHERRY);
-            set_tile(row, (unsigned char)(mid + 1), FONT_TILE_BASE);
-            break;
-        default:
-            draw_text(row, (unsigned char)(mid - 1), "BAR");
-            break;
-    }
+    slot_symbol_tiles(symbol, tiles);
+    set_tile(row, (unsigned char)(mid - 1), tiles[0]);
+    set_tile(row, mid, tiles[1]);
+    set_tile(row, (unsigned char)(mid + 1), tiles[2]);
 }
 
 /* Dynamic casino content fits in one 32-tile NMI batch. Initial scene and
@@ -90,26 +108,12 @@ static void draw_slot_symbol(unsigned char row, unsigned char left_col, unsigned
 static void queue_slot_symbol(unsigned char row, unsigned char left_col, unsigned char symbol)
 {
     unsigned char mid = (unsigned char)(left_col + 4);
+    unsigned char tiles[3];
 
-    switch (symbol) {
-        case CASINO_SYMBOL_SEVEN:
-            (void)vram_queue_tile(row, (unsigned char)(mid - 1), FONT_TILE_BASE);
-            (void)vram_queue_tile(row, mid, CARD_SLOT_SEVEN);
-            (void)vram_queue_tile(row, (unsigned char)(mid + 1), FONT_TILE_BASE);
-            break;
-        case CASINO_SYMBOL_CHERRY:
-            (void)vram_queue_tile(row, (unsigned char)(mid - 1), FONT_TILE_BASE);
-            (void)vram_queue_tile(row, mid, CARD_SLOT_CHERRY);
-            (void)vram_queue_tile(row, (unsigned char)(mid + 1), FONT_TILE_BASE);
-            break;
-        default:
-            (void)vram_queue_tile(row, (unsigned char)(mid - 1),
-                                  (unsigned char)(FONT_TILE_BASE + font_glyph_index('B')));
-            (void)vram_queue_tile(row, mid, (unsigned char)(FONT_TILE_BASE + font_glyph_index('A')));
-            (void)vram_queue_tile(row, (unsigned char)(mid + 1),
-                                  (unsigned char)(FONT_TILE_BASE + font_glyph_index('R')));
-            break;
-    }
+    slot_symbol_tiles(symbol, tiles);
+    (void)vram_queue_tile(row, (unsigned char)(mid - 1), tiles[0]);
+    (void)vram_queue_tile(row, mid, tiles[1]);
+    (void)vram_queue_tile(row, (unsigned char)(mid + 1), tiles[2]);
 }
 
 /* Always exactly 2 digits -- for values that genuinely never reach 100:
@@ -185,19 +189,63 @@ static void draw_casino_hud(void)
     draw_slot_symbol(SLOTS_SYMBOL_ROW, (unsigned char)(2 * SLOTS_WINDOW_SPACING), casino_reel[2]);
 }
 
-/* The reels themselves show the resolved symbols, so this one-shot line
- * only needs to report whether that completed pull won. Keeping it short
- * leaves the casino bank room for the roulette board. */
+/* Multipliers here are written out matching casino_payout()'s own table
+ * (see v2_casino.c) exactly -- same by-hand-sync discipline as
+ * draw_poker_payout_table(), no shared source of truth between game logic
+ * and this display. Symbol names come from casino_slot_symbols[] itself
+ * rather than being retyped, so at least those two can't drift apart. */
+static void draw_slots_payout_table(void)
+{
+    static const unsigned char multiplier[CASINO_SYMBOL_COUNT] = {10, 7, 5};
+    unsigned char i;
+
+    for (i = 0; i < CASINO_SYMBOL_COUNT; ++i) {
+        draw_payout_row((unsigned char)(SLOTS_PAYOUT_TABLE_TOP + i), casino_slot_symbols[i], multiplier[i]);
+    }
+    /* BAR is wild (see casino_is_winner() in v2_casino.c) -- it stands in
+     * for whichever other symbol the remaining reels show, so e.g. 7-7-
+     * BAR still wins at 7's rate. Spelled out here since nothing else on
+     * screen would tell the player a mismatched pull can still be a win. */
+    draw_text((unsigned char)(SLOTS_PAYOUT_TABLE_TOP + CASINO_SYMBOL_COUNT), 2, "BAR WILD");
+}
+
+/* Lengths of casino_slot_symbols[]'s own three strings ("7"/"BAR"/
+ * "CHERRY"), index-matched -- a runtime strlen loop costs more code than
+ * this 3-byte table in a bank this tight. */
+static const unsigned char slot_symbol_len[CASINO_SYMBOL_COUNT] = {1, 3, 6};
+
+/* The result of the most recent pull -- spells out all three reels plus
+ * the outcome ("7 7 BAR WIN +10") rather than a bare "WIN"/"NO WIN",
+ * which didn't say what actually lined up or how much it paid, and read
+ * as unclear once BAR's wild substitution meant a win no longer has to be
+ * three matching symbols. Worst case ("CHERRY CHERRY CHERRY WIN +NNN",
+ * the longest name three times over) is well under a row's 32 columns.
+ *
+ * Unlike the reel/credits/bet HUD, this doesn't go through the NMI queue:
+ * it only changes once per pull (when the spin settles, see
+ * run_slots_game()), not continuously during one, and adding a message
+ * this long to the same queued batch that already updates the reels/
+ * credits/bet/lever would overflow the queue's fixed 32-entry capacity.
+ * A one-shot forced-blank write, the same as every other non-continuous
+ * update in this file, is simpler and safe regardless of how long it
+ * takes. */
 static void show_slots_result(void)
 {
     unsigned char payout = casino_payout(&game_state.casino);
+    unsigned char col = 0;
+    unsigned char i;
 
     PPU.mask = 0;
     fill_title_rect(SLOTS_RESULT_ROW, 0, 32, 1, FONT_TILE_BASE);
+    for (i = 0; i < CASINO_REEL_COUNT; ++i) {
+        draw_text(SLOTS_RESULT_ROW, col, casino_slot_symbols[casino_reel[i]]);
+        col = (unsigned char)(col + slot_symbol_len[casino_reel[i]] + 1);
+    }
     if (payout) {
-        draw_text(SLOTS_RESULT_ROW, 10, "WIN");
+        draw_text(SLOTS_RESULT_ROW, col, "WIN +");
+        draw_digits3(SLOTS_RESULT_ROW, (unsigned char)(col + 5), payout);
     } else {
-        draw_text(SLOTS_RESULT_ROW, 9, "NO WIN");
+        draw_text(SLOTS_RESULT_ROW, col, "NO WIN");
     }
     reset_scroll();
     PPU.mask = 0x1E;
@@ -323,7 +371,7 @@ static void show_casino(void)
     set_tile(10, 6, BAR_TILE_JUKEBOX_TOP);
     set_tile(11, 5, BAR_TILE_JUKEBOX_BOT);
     set_tile(11, 6, BAR_TILE_JUKEBOX_BOT);
-    draw_text(7, 3, "POKER");
+    draw_text(7, 3, poker_title);
 
     /* Blackjack table, on the right side. No CHR budget left for
      * dedicated table art (see TOKEN_TILE's comment) -- but Neon
@@ -399,7 +447,8 @@ static void show_casino(void)
  * only ever populated after an actual pull, never drawn here. */
 static void show_slots_screen(void)
 {
-    show_casino_game_screen("SLOTS");
+    show_casino_game_screen(casino_slots_text);
+    draw_slots_payout_table();
     draw_slots_windows();
     draw_slots_lever(0);
     draw_casino_hud();
@@ -572,7 +621,7 @@ static void show_blackjack_screen(void)
     unsigned char natural = (unsigned char)(game_state.casino.blackjack_player_count == 2 &&
                                              casino_blackjack_player_total(&game_state.casino) == 21);
 
-    show_casino_game_screen("BLACKJACK");
+    show_casino_game_screen(casino_blackjack_text);
     draw_text(BLACKJACK_PAYOUT_TABLE_TOP, 2, "BLACKJACK PAYS 3:2");
     draw_text((unsigned char)(BLACKJACK_PAYOUT_TABLE_TOP + 1), 2, "WIN PAYS 1:1  PUSH EVEN");
     draw_text(BLACKJACK_DEALER_LABEL_ROW, 4, "DEALER CARDS");
@@ -600,31 +649,36 @@ static void show_blackjack_screen(void)
     }
     if (game_state.casino.blackjack_state == CASINO_GAME_ACTIVE) {
         draw_text(24, 5, "A HIT   B STAND");
-    } else if (game_state.casino.blackjack_state == CASINO_GAME_RESOLVED) {
-        /* blackjack_payout is bet*2 on an outright win (or the natural
-         * table's 3:2 figure on a natural), exactly bet on a push (player
-         * just gets their own bet back, no net gain), and 0 on a loss --
-         * three outcomes, not two, now that the actual number is on
-         * screen and would otherwise make a push look like a mislabeled
-         * win. A natural win specifically says so rather than just
-         * "YOU WIN" -- the payout number alone can't tell them apart (a
-         * natural at bet 1 and a plain win at bet 1 both pay 2). */
-        if (game_state.casino.blackjack_payout == 0) {
-            draw_text(24, 11, "HOUSE WINS");
-        } else if (game_state.casino.blackjack_payout == game_state.casino.bet) {
-            draw_text(24, 12, "PUSH");
-        } else if (natural) {
-            draw_text(24, 5, "BLACKJACK! +");
-            draw_digits2(24, 17, game_state.casino.blackjack_payout);
-        } else {
-            draw_text(24, 8, "YOU WIN +");
-            draw_digits2(24, 17, game_state.casino.blackjack_payout);
+    } else {
+        /* RESOLVED and READY both end up showing "A DEAL   B OUT" --
+         * used to be two separate copies of that literal, one at the end
+         * of each branch; hoisted out here since only the RESOLVED case
+         * has anything extra (the outcome text) to show first. */
+        if (game_state.casino.blackjack_state == CASINO_GAME_RESOLVED) {
+            /* blackjack_payout is bet*2 on an outright win (or the natural
+             * table's 3:2 figure on a natural), exactly bet on a push
+             * (player just gets their own bet back, no net gain), and 0 on
+             * a loss -- three outcomes, not two, now that the actual
+             * number is on screen and would otherwise make a push look
+             * like a mislabeled win. A natural win specifically says so
+             * rather than just "YOU WIN" -- the payout number alone can't
+             * tell them apart (a natural at bet 1 and a plain win at bet 1
+             * both pay 2). */
+            if (game_state.casino.blackjack_payout == 0) {
+                draw_text(24, 11, "HOUSE WINS");
+            } else if (game_state.casino.blackjack_payout == game_state.casino.bet) {
+                draw_text(24, 12, "PUSH");
+            } else if (natural) {
+                draw_text(24, 5, "BLACKJACK! +");
+                draw_digits2(24, 17, game_state.casino.blackjack_payout);
+            } else {
+                draw_text(24, 8, you_win_text);
+                draw_digits2(24, 17, game_state.casino.blackjack_payout);
+            }
         }
         draw_text(26, 5, "A DEAL   B OUT");
-    } else {
-        draw_text(26, 5, "A DEAL   B OUT");
     }
-    draw_text(28, 6, "L R: BET");
+    draw_text(28, 6, lr_bet_text);
     reset_scroll();
     PPU.mask = 0x1E;
 }
@@ -680,23 +734,23 @@ static void run_blackjack_game(void)
  * down to make room instead of overlapping it. */
 #define POKER_CARD_ROW 19
 
-/* casino_poker_result() (see v2_casino.c) returns a POKER_RESULT_* value;
- * this is the only place that turns it into words, keeping the actual
- * ranking logic free of display text. */
+/* casino_poker_result() (see v2_casino.c) returns a POKER_RESULT_* value
+ * (see its enum for the NONE..ROYAL_FLUSH order this table matches);
+ * poker_result_text() and draw_poker_payout_table() below both read
+ * names from here instead of each spelling out its own copy of "ROYAL
+ * FLUSH" etc. -- this scene's own PRG bank is tight enough that the
+ * duplicated string literals were a real cost, not just tidiness. The
+ * multiplier table matches casino_poker_payout()'s own (see v2_casino.c)
+ * by hand, same as before. */
+static const char * const poker_hand_name[10] = {
+    "NO WIN", "PAIR", "TWO PAIR", "THREE OF A KIND", "STRAIGHT",
+    "FLUSH", "FULL HOUSE", "FOUR OF A KIND", "STRAIGHT FLUSH", "ROYAL FLUSH"
+};
+static const unsigned char poker_multiplier[10] = {0, 2, 3, 4, 5, 6, 9, 15, 30, 100};
+
 static const char *poker_result_text(unsigned char result)
 {
-    switch (result) {
-        case POKER_RESULT_ROYAL_FLUSH: return "ROYAL FLUSH";
-        case POKER_RESULT_STRAIGHT_FLUSH: return "STRAIGHT FLUSH";
-        case POKER_RESULT_QUAD: return "FOUR OF A KIND";
-        case POKER_RESULT_FULL_HOUSE: return "FULL HOUSE";
-        case POKER_RESULT_FLUSH: return "FLUSH";
-        case POKER_RESULT_STRAIGHT: return "STRAIGHT";
-        case POKER_RESULT_TRIPLE: return "THREE OF A KIND";
-        case POKER_RESULT_TWO_PAIR: return "TWO PAIR";
-        case POKER_RESULT_PAIR: return "PAIR";
-        default: return "NO WIN";
-    }
+    return poker_hand_name[result];
 }
 
 /* Name at a fixed left column, "X" plus its multiplier at a fixed right
@@ -720,22 +774,21 @@ static void draw_payout_row(unsigned char row, const char *name, unsigned char m
 #define POKER_PAYOUT_TABLE_TOP 7
 #define POKER_HAND_LABEL_ROW 17
 
-/* Multipliers here are written out matching casino_poker_payout()'s own
- * table (see v2_casino.c) exactly -- there's no shared source of truth
- * between game logic and this display, so keeping them in sync is a
- * by-hand discipline, same as poker_result_text() already is for the
- * result names. */
+/* Walks poker_hand_name[]/poker_multiplier[] from ROYAL_FLUSH (index 9)
+ * down to TWO_PAIR (index 2), best hand first -- a loop instead of 8
+ * individual draw_payout_row() calls, since each explicit call site
+ * used to carry its own copy of the name string. The last row (PAIR) is
+ * drawn separately with the "10+" reminder, since that's specific to
+ * this table and not part of poker_result_text()'s plain "PAIR". */
 static void draw_poker_payout_table(void)
 {
-    draw_payout_row(POKER_PAYOUT_TABLE_TOP, "ROYAL FLUSH", 100);
-    draw_payout_row((unsigned char)(POKER_PAYOUT_TABLE_TOP + 1), "STRAIGHT FLUSH", 30);
-    draw_payout_row((unsigned char)(POKER_PAYOUT_TABLE_TOP + 2), "FOUR OF A KIND", 15);
-    draw_payout_row((unsigned char)(POKER_PAYOUT_TABLE_TOP + 3), "FULL HOUSE", 9);
-    draw_payout_row((unsigned char)(POKER_PAYOUT_TABLE_TOP + 4), "FLUSH", 6);
-    draw_payout_row((unsigned char)(POKER_PAYOUT_TABLE_TOP + 5), "STRAIGHT", 5);
-    draw_payout_row((unsigned char)(POKER_PAYOUT_TABLE_TOP + 6), "THREE OF A KIND", 4);
-    draw_payout_row((unsigned char)(POKER_PAYOUT_TABLE_TOP + 7), "TWO PAIR", 3);
-    draw_payout_row((unsigned char)(POKER_PAYOUT_TABLE_TOP + 8), "PAIR 10+", 2);
+    unsigned char i;
+
+    for (i = 0; i < 8; ++i) {
+        draw_payout_row((unsigned char)(POKER_PAYOUT_TABLE_TOP + i),
+                         poker_hand_name[9 - i], poker_multiplier[9 - i]);
+    }
+    draw_payout_row((unsigned char)(POKER_PAYOUT_TABLE_TOP + 8), "PAIR 10+", poker_multiplier[1]);
 }
 
 /* Moves the single cursor tile above the hand without touching anything
@@ -770,7 +823,7 @@ static void show_poker_screen(unsigned char selected)
 {
     unsigned char i, col;
 
-    show_casino_game_screen("POKER");
+    show_casino_game_screen(poker_title);
     draw_poker_payout_table();
     draw_text(POKER_HAND_LABEL_ROW, 4, "HAND");
     if (game_state.casino.poker_state == CASINO_GAME_READY) {
@@ -794,7 +847,7 @@ static void show_poker_screen(unsigned char selected)
         if (game_state.casino.poker_state == CASINO_GAME_RESOLVED) {
             draw_text(25, 4, poker_result_text(casino_poker_result(&game_state.casino)));
             if (game_state.casino.poker_payout) {
-                draw_text(26, 6, "YOU WIN +");
+                draw_text(26, 6, you_win_text);
                 draw_digits3(26, 15, game_state.casino.poker_payout);
             } else {
                 draw_text(26, 6, "NO PAYOUT");
@@ -804,7 +857,7 @@ static void show_poker_screen(unsigned char selected)
     if (game_state.casino.poker_state == CASINO_GAME_ACTIVE) {
         draw_text(28, 3, "A HOLD B GO L R PICK");
     } else {
-        draw_text(27, 6, "L R: BET");
+        draw_text(27, 6, lr_bet_text);
         draw_text(28, 4, "A DEAL B OUT");
     }
     reset_scroll();
