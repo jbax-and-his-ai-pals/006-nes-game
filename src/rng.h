@@ -23,6 +23,12 @@ typedef struct { unsigned char state; } RngState;
  * more zeroes). */
 void rng_seed(RngState *rng, unsigned char seed);
 
+/* Returns a fresh per-game seed byte, derived from the free-running vblank
+ * frame counter (implemented in startup.s). The frame an action lands on
+ * depends on the player's timing, so this varies between runs and between
+ * successive calls. Never returns 0. */
+unsigned char random_seed(void);
+
 /* Returns the next byte in the sequence (0-255, every non-zero value
  * exactly once every 255 calls -- an 8-bit Galois LFSR is a maximal
  * length generator, not uniform-random, but good enough for picking

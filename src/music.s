@@ -8,123 +8,31 @@
         .export _music_start, _music_select_song, _music_play_jukebox_fanfare, _music_sfx_swing, _music_sfx_pickup
         .export _music_sfx_dialogue, _music_sfx_hit, _music_sfx_hurt
         .export _music_sfx_door, music_nmi_tick
+        .export _music_sfx_confirm, _music_sfx_cancel, _music_sfx_bell
+        ; C reads/writes music_scene_bank (the fixed_scene_stubs set it to the
+        ; bank a scene just mapped, so music_select_song can restore it).
+        .export _music_scene_bank
+        ; music_select_song maps the music bank to copy the selected song into
+        ; the fixed-RAM cache, then restores the scene bank.
+        .import _mmc3_select_prg_pair
 
         .include "nes.inc"
 
 MUSIC_STEPS = 32
-MUSIC_SONG_COUNT = 7
+MUSIC_STEPS_BAR = 96
+MUSIC_SONG_BAR = 1
+MUSIC_SONG_COUNT = 8
+MUSIC_SONG_TITLE = 7
+; First bank of the PRG pair holding the music bank (see
+; assets/banks/manifest.json and src/music_songs.s).
+MUSIC_BANK_BASE = 19
+; Every song block in the music bank is this many bytes (see gen_music_songs.py).
+; Each song holds up to 96 steps (6 * 96 + two 1-byte flags); scenes and the
+; title pad their shorter loops so the stride stays uniform for the copy loop.
+SONG_BLOCK_SIZE = 578
 
 .segment "FIXED_ENGINE_RODATA"
-; A high-energy title/avenue overture. Pulse 1 races through broken chords,
-; briefly hangs on dramatic peaks, then drops into a jagged turnaround while
-; triangle punches out wide bass leaps. It is an original late-80s NES action
-; arrangement: dense, theatrical, and deliberately less lounge-like than the
-; location loops below. Period bytes target NTSC APU timers.
-melody_lo:
-        .byte $1E,$54,$7D,$54, $1E,$54,$7D,$AA
-        .byte $D6,$BE,$AA,$BE, $D6,$E2,$1E,$54
-        .byte $7D,$54,$41,$54, $7D,$AA,$BE,$AA
-        .byte $7D,$54,$1E,$E2, $D6,$BE,$AA,$FE
-melody_hi:
-        .byte $F9,$F9,$F9,$F9, $F9,$F9,$F9,$F8
-        .byte $F8,$F8,$F8,$F8, $F8,$F8,$F9,$F9
-        .byte $F9,$F9,$F9,$F9, $F9,$F8,$F8,$F8
-        .byte $F9,$F9,$F9,$F8, $F8,$F8,$F8,$F8
-bass_lo:
-        .byte $57,$57,$57,$57, $85,$85,$85,$85
-        .byte $3D,$3D,$3D,$3D, $A9,$A9,$A9,$A9
-        .byte $57,$57,$57,$57, $C7,$C7,$C7,$C7
-        .byte $3D,$3D,$85,$85, $A9,$A9,$57,$57
-bass_hi:
-        .byte $FB,$FB,$FB,$FB, $FA,$FA,$FA,$FA
-        .byte $FA,$FA,$FA,$FA, $F9,$F9,$F9,$F9
-        .byte $FB,$FB,$FB,$FB, $F9,$F9,$F9,$F9
-        .byte $FA,$FA,$FA,$FA, $F9,$F9,$FB,$FB
-step_frames:
-        .byte 4,4,4,4, 4,4,4,7
-        .byte 5,4,4,4, 5,7,4,6
-        .byte 4,4,4,4, 5,4,6,4
-        .byte 4,4,5,4, 6,4,5,14
-
-; Each location has a complete 32-step arrangement. The second half answers
-; or detours from the opening phrase rather than repeating it, so a room can
-; breathe for a while before its loop comes back around. This is still just
-; table lookup in NMI: no game-loop work and no extra timing risk.
-bar_melody_lo:
-        .byte $D6,$BE,$AA,$BE,$D6,$FE,$E2,$BE, $D6,$AA,$BE,$D6,$E2,$FE,$1E,$D6
-        .byte $BE,$AA,$7D,$AA,$BE,$D6,$FE,$E2, $D6,$BE,$AA,$BE,$D6,$E2,$FE,$1E
-; The location melodies vary by pitch table; a shared octave contour keeps
-; their 32-step arrangements compact enough to preserve fixed-engine slack.
-variant_melody_hi:
-        .byte $F8,$F8,$F8,$F8,$F8,$F8,$F8,$F8, $F8,$F8,$F8,$F8,$F8,$F8,$F9,$F8
-        .byte $F8,$F8,$F9,$F8,$F8,$F8,$F8,$F8, $F8,$F8,$F8,$F8,$F8,$F8,$F8,$F9
-bar_step_frames:
-        .byte 6,6,12,6, 8,6,16,8, 5,7,9,6, 12,5,10,15
-        .byte 7,5,12,6, 8,7,14,6, 6,8,10,5, 12,7,9,20
-mart_melody_lo:
-        .byte $54,$41,$54,$7D,$54,$41,$54,$1E, $41,$54,$7D,$AA,$7D,$54,$41,$1E
-        .byte $54,$7D,$AA,$7D,$54,$41,$54,$1E, $41,$54,$7D,$54,$41,$1E,$54,$7D
-mart_step_frames:
-        .byte 5,5,5,10, 5,5,7,14, 4,6,5,9, 7,5,8,13
-        .byte 5,7,6,10, 4,6,5,15, 6,5,8,5, 7,12,5,18
-sewer_melody_lo:
-        .byte $E2,$FE,$D6,$FE,$BE,$FE,$D6,$FE, $AA,$FE,$BE,$FE,$D6,$FE,$E2,$FE
-        .byte $D6,$FE,$BE,$FE,$AA,$FE,$BE,$FE, $D6,$FE,$E2,$FE,$D6,$FE,$BE,$FE
-sewer_step_frames:
-        .byte 18,8,14,8, 20,8,12,16, 16,7,18,9, 14,8,22,10
-        .byte 15,8,20,8, 13,9,17,7, 21,8,14,10, 18,8,16,26
-park_melody_lo:
-        .byte $1E,$54,$7D,$54,$1E,$54,$41,$54, $7D,$AA,$7D,$54,$41,$54,$1E,$54
-        .byte $54,$7D,$AA,$BE,$AA,$7D,$54,$41, $1E,$54,$7D,$54,$41,$54,$1E,$54
-park_step_frames:
-        .byte 8,6,10,6, 12,6,8,16, 6,7,9,5, 11,7,10,14
-        .byte 7,8,6,12, 5,9,7,11, 10,6,8,6, 12,7,9,22
-casino_melody_lo:
-        .byte $54,$1E,$54,$7D,$41,$54,$1E,$54, $D6,$BE,$D6,$54,$41,$54,$7D,$54
-        .byte $1E,$54,$7D,$AA,$7D,$54,$41,$54, $D6,$E2,$D6,$BE,$AA,$7D,$54,$1E
-casino_step_frames:
-        .byte 4,4,6,4, 8,4,4,10, 4,4,6,4, 8,4,6,14
-        .byte 5,4,7,5, 8,4,6,10, 4,5,6,4, 9,5,7,16
-zoo_melody_lo:
-        .byte $7D,$54,$41,$54,$7D,$AA,$7D,$54, $41,$54,$7D,$AA,$BE,$AA,$7D,$54
-        .byte $54,$7D,$AA,$BE,$D6,$BE,$AA,$7D, $54,$41,$54,$7D,$AA,$7D,$54,$1E
-zoo_step_frames:
-        .byte 10,8,12,8, 14,8,10,16, 9,7,11,8, 13,9,12,15
-        .byte 8,10,7,12, 14,8,10,9, 11,8,10,7, 13,9,11,24
-
-bar_bass_lo:
-        .byte $57,$57,$85,$85,$3D,$3D,$57,$57, $A9,$A9,$57,$57,$85,$85,$3D,$3D
-        .byte $57,$57,$3D,$3D,$85,$85,$57,$57, $A9,$57,$85,$3D,$57,$57,$3D,$3D
-mart_bass_lo:
-        .byte $57,$57,$3D,$3D,$57,$57,$85,$85, $3D,$3D,$57,$57,$A9,$A9,$85,$85
-        .byte $57,$57,$85,$85,$3D,$3D,$57,$57, $A9,$A9,$57,$57,$3D,$3D,$85,$85
-mart_bass_hi:
-        .byte $FB,$FB,$FA,$FA,$FB,$FB,$FA,$FA, $FA,$FA,$FB,$FB,$F9,$F9,$FA,$FA
-        .byte $FB,$FB,$FA,$FA,$FA,$FA,$FB,$FB, $F9,$F9,$FB,$FB,$FA,$FA,$FA,$FA
-sewer_bass_lo:
-        .byte $3D,$3D,$FE,$FE,$A9,$A9,$FE,$FE, $57,$57,$FE,$FE,$85,$85,$FE,$FE
-        .byte $3D,$3D,$FE,$FE,$57,$57,$FE,$FE, $A9,$A9,$FE,$FE,$85,$85,$FE,$FE
-sewer_bass_hi:
-        .byte $FA,$FA,$FA,$FA,$F9,$F9,$FA,$FA, $FB,$FB,$FA,$FA,$FA,$FA,$FA,$FA
-        .byte $FA,$FA,$FA,$FA,$FB,$FB,$FA,$FA, $F9,$F9,$FA,$FA,$FA,$FA,$FA,$FA
-park_bass_lo:
-        .byte $85,$85,$57,$57,$3D,$3D,$57,$57, $A9,$A9,$57,$57,$85,$85,$3D,$3D
-        .byte $57,$57,$85,$85,$A9,$A9,$57,$57, $3D,$3D,$57,$57,$85,$85,$57,$57
-park_bass_hi:
-        .byte $FA,$FA,$FB,$FB,$FA,$FA,$FB,$FB, $F9,$F9,$FB,$FB,$FA,$FA,$FA,$FA
-        .byte $FB,$FB,$FA,$FA,$F9,$F9,$FB,$FB, $FA,$FA,$FB,$FB,$FA,$FA,$FB,$FB
-casino_bass_lo:
-        .byte $57,$3D,$85,$57,$A9,$85,$57,$3D, $57,$A9,$85,$57,$3D,$57,$85,$A9
-        .byte $3D,$57,$85,$A9,$57,$3D,$57,$85, $A9,$85,$57,$3D,$57,$85,$A9,$57
-casino_bass_hi:
-        .byte $FB,$FA,$FA,$FB,$F9,$FA,$FB,$FA, $FB,$F9,$FA,$FB,$FA,$FB,$FA,$F9
-        .byte $FA,$FB,$FA,$F9,$FB,$FA,$FB,$FA, $F9,$FA,$FB,$FA,$FB,$FA,$F9,$FB
-zoo_bass_lo:
-        .byte $85,$57,$85,$3D,$57,$85,$A9,$85, $57,$3D,$57,$85,$A9,$85,$57,$3D
-        .byte $85,$A9,$85,$57,$3D,$57,$85,$A9, $85,$57,$3D,$57,$85,$A9,$85,$57
-zoo_bass_hi:
-        .byte $FA,$FB,$FA,$FA,$FB,$FA,$F9,$FA, $FB,$FA,$FB,$FA,$F9,$FA,$FB,$FA
-        .byte $FA,$F9,$FA,$FB,$FA,$FB,$FA,$F9, $FA,$FB,$FA,$FB,$FA,$F9,$FA,$FB
+; Song data now lives in the music bank (src/music_songs.s).
 
 ; One-shot Jimbles's jukebox fanfare, transcribed directly from the requested
 ; A5 A5 G5 F5 F5 F5 G5 A5 F5 F5 F5 G5 G5 F5 E5 F5 phrase. Each note lasts
@@ -138,8 +46,9 @@ jukebox_melody_hi:
         .byte $F8,$F8,$F8,$F8, $F8,$F8,$F8,$F8
 
 .segment "BSS"
-music_step:     .res 1
-music_frames:   .res 1
+_music_step:     .res 1
+_music_frames:   .res 1
+_music_steps:    .res 1          ; loop length of the current song (title: 16)
 music_enabled:  .res 1
 music_song:     .res 1
 jukebox_state:  .res 1       ; 0 = inactive, 1 = phrase, 2 = quiet pause
@@ -147,6 +56,20 @@ jukebox_step:   .res 1
 jukebox_frames: .res 1
 pickup_phase:   .res 1
 pickup_frames:  .res 1
+; Fixed-RAM cache of the current song's block (578 bytes), copied from the
+; music bank on music_select_song so the NMI never touches a PRG bank.
+; Every song reserves 96 step slots; scenes and the title use fewer.
+music_ram_melody_lo:   .res 96
+music_ram_melody_hi:   .res 96
+music_ram_bass_lo:     .res 96
+music_ram_bass_hi:     .res 96
+music_ram_step_frames: .res 96
+music_ram_noise:       .res 96
+music_ram_has_bass:    .res 1
+music_ram_has_noise:   .res 1
+; First PRG bank of the scene currently mapped at $8000, so music_select_song
+; can restore it after briefly mapping the music bank to copy the song.
+_music_scene_bank:     .res 1
 
 .segment "FIXED_ENGINE"
 _music_start:
@@ -164,26 +87,96 @@ _music_start:
         sta APU_PULSE2CTRL
         sta APU_NOISECTRL
         lda #0
-        sta music_step
+        sta _music_step
         sta music_song
         sta jukebox_state
-        jsr music_load_step
+        ; No song is loaded here: the RAM cache is empty until the title (or a
+        ; scene) calls music_select_song, which copies the song's block in.
         lda #1
         sta music_enabled
         rts
 
-; Restart a selected loop on scene entry. The NMI remains the only routine
-; which advances notes, so selecting a new song cannot affect frame pacing.
+; Select a loop and cache it. The NMI reads only the fixed-RAM cache, so we
+; briefly map the music bank (just to copy the current song's block), then
+; restore whichever scene bank was mapped when we were called.
 _music_select_song:
         cmp #MUSIC_SONG_COUNT
         bcc :+
         lda #0
 :
-        sta music_song
+        cmp music_song              ; if the requested song is the one currently
+        beq @keep_playing           ; loaded, keep playing it instead of restarting
+        sta music_song              ; A holds the clamped song here
+        lda #$BF                    ; pulse 1 at full volume for the new loop
+        sta APU_PULSE1CTRL
+        lda #$9A                    ; continuous triangle bass;
+        sta APU_TRICTRL1            ; the loader gates it per song
+        lda #MUSIC_BANK_BASE
+        jsr _mmc3_select_prg_pair
+        lda music_song
+        asl a
+        tax
+        lda $8000,x                 ; pointer-table low byte of this song's block
+        sta $0020
+        lda $8001,x                 ; pointer-table high byte
+        sta $0021
+        ; Song blocks are now 386 bytes (up to 64 steps), which the 8-bit
+        ; Y/X register loop could not span, so copy via 16-bit source ($0020)
+        ; and destination ($0022) pointers and a 16-bit count ($0024/$0025).
+        lda #<music_ram_melody_lo
+        sta $0022
+        lda #>music_ram_melody_lo
+        sta $0023
+        lda #<SONG_BLOCK_SIZE
+        sta $0024
+        lda #>SONG_BLOCK_SIZE
+        sta $0025
+        ldy #0
+@copy:
+        lda ($0020),y
+        sta ($0022),y
+        iny
+        bne @copy_next
+        inc $0021                   ; source moved past a 256-byte page
+        inc $0023                   ; destination too
+@copy_next:
+        lda $0024
+        bne @copy_dec_lo
+        dec $0025                   ; low count byte wrapped: borrow the high
+@copy_dec_lo:
+        dec $0024
+        lda $0024
+        ora $0025
+        bne @copy
+@copy_done:
+        lda _music_scene_bank
+        jsr _mmc3_select_prg_pair
+        ; Per-song loop length. The bar interior runs its full 96-step arc;
+        ; scenes use the first 32 steps of their padded block; the title is a
+        ; single 16-step phrase (its block repeats the phrase to fill the stride).
+        lda music_song
+        cmp #MUSIC_SONG_BAR
+        bne @not_bar
+        lda #MUSIC_STEPS_BAR
+        jmp @steps0
+@not_bar:
+        cmp #MUSIC_SONG_TITLE
+        bne @loc32
+        lda #16
+        jmp @steps0
+@loc32:
+        lda #MUSIC_STEPS
+@steps0:
+        sta _music_steps
         lda #0
-        sta music_step
+        sta _music_step
         sta jukebox_state
         jsr music_load_step
+        rts
+
+; Same song already playing (the bar, casino, and commentarium share one loop
+; so walking between them keeps the music going instead of restarting it).
+@keep_playing:
         rts
 
 ; Play the jukebox phrase once, then resume the original loop after a short
@@ -210,116 +203,83 @@ music_nmi_tick:
 :
         jmp music_done
 music_tick:
-        dec music_frames
+        dec _music_frames
         beq music_advance
         jmp music_done
 music_advance:
-        inc music_step
-        lda music_step
-        cmp #MUSIC_STEPS
+        inc _music_step
+        lda _music_step
+        cmp _music_steps
         bcc :+
         lda #0
-        sta music_step
+        sta _music_step
 :
         jmp music_load_step
 
+; The single step loader: reads the current song's cached block from fixed
+; RAM (music_ram_*) and writes the voices. No bank access, safe in NMI.
+; A $00 melody period low byte is a rest (pulse 1 silenced); has_bass/has_noise
+; gate the triangle and noise voices.
 music_load_step:
-        lda music_song
-        bne :+
-        jmp music_load_avenue
-:
-        cmp #1
-        bne :+
-        jmp music_load_bar
-:
-        cmp #2
-        bne :+
-        jmp music_load_mart
-:
-        cmp #3
-        bne :+
-        jmp music_load_sewer
-:
-        cmp #4
-        bne :+
-        jmp music_load_park
-:
-        cmp #5
-        bne :+
-        jmp music_load_casino
-:
-        jmp music_load_zoo
-
-; The loader copies a single selected step to the two music voices. Each
-; branch is static and index-only, avoiding mapper reads or C work in NMI.
-.macro LOAD_SONG melodylo, melodyhi, basslo, basshi
-        ldx music_step
-        lda step_frames,x
-        sta music_frames
-        lda melodylo,x
+        ldx _music_step
+        lda music_ram_step_frames,x
+        sta _music_frames
+        lda music_ram_melody_lo,x
         sta APU_PULSE1FTUNE
-        lda melodyhi,x
+        lda music_ram_melody_hi,x
         sta APU_PULSE1CTUNE
-        lda basslo,x
+        lda music_ram_melody_lo,x
+        beq @rest
+        lda #$BF
+        sta APU_PULSE1CTRL
+        jmp @triangle
+@rest:
+        lda #$30
+        sta APU_PULSE1CTRL
+@triangle:
+        lda music_ram_has_bass
+        beq @triangle_off
+        lda music_ram_bass_lo,x
+        beq @triangle_off       ; $00 bass low byte is a rest: keep it silent
+        lda #$9A
+        sta APU_TRICTRL1
+        lda music_ram_bass_lo,x
         sta APU_TRIFREQ1
-        lda basshi,x
+        lda music_ram_bass_hi,x
         sta APU_TRIFREQ2
+        jmp @noise
+@triangle_off:
+        lda #$00
+        sta APU_TRICTRL1
+@noise:
+        lda music_ram_has_noise
+        beq @noise_off
+        lda music_ram_noise,x
+        cmp #$FF
+        beq @noise_off
+        sta APU_NOISEFREQ1
+        lda #$58
+        sta APU_NOISEFREQ2
+        lda #$18
+        sta APU_NOISECTRL
         rts
-.endmacro
-
-.macro LOAD_VARIANT melodylo, melodyhi, basslo, basshi, frames
-        ldx music_step
-        lda frames,x
-        sta music_frames
-        lda melodylo,x
-        sta APU_PULSE1FTUNE
-        lda melodyhi,x
-        sta APU_PULSE1CTUNE
-        lda basslo,x
-        sta APU_TRIFREQ1
-        lda basshi,x
-        sta APU_TRIFREQ2
-        rts
-.endmacro
-
-music_load_avenue:
-        LOAD_SONG melody_lo, melody_hi, bass_lo, bass_hi
-music_load_bar:
-        LOAD_VARIANT bar_melody_lo, variant_melody_hi, bar_bass_lo, park_bass_hi, bar_step_frames
-music_load_mart:
-        LOAD_VARIANT mart_melody_lo, variant_melody_hi, mart_bass_lo, mart_bass_hi, mart_step_frames
-music_load_sewer:
-        LOAD_VARIANT sewer_melody_lo, variant_melody_hi, sewer_bass_lo, sewer_bass_hi, sewer_step_frames
-music_load_park:
-        LOAD_VARIANT park_melody_lo, variant_melody_hi, park_bass_lo, park_bass_hi, park_step_frames
-music_load_casino:
-        LOAD_VARIANT casino_melody_lo, variant_melody_hi, casino_bass_lo, casino_bass_hi, casino_step_frames
-music_load_zoo:
-        LOAD_VARIANT zoo_melody_lo, variant_melody_hi, zoo_bass_lo, zoo_bass_hi, zoo_step_frames
-
-; Legacy loader body retained below for source history.
-music_load_step_legacy:
-        ldx music_step
-        lda step_frames,x
-        sta music_frames
-        lda melody_lo,x
-        sta APU_PULSE1FTUNE
-        lda melody_hi,x             ; writing high byte restarts its length
-        sta APU_PULSE1CTUNE
-        lda bass_lo,x
-        sta APU_TRIFREQ1
-        lda bass_hi,x
-        sta APU_TRIFREQ2
+@noise_off:
+        lda #$00
+        sta APU_NOISECTRL
         rts
 
 ; The fanfare takes over pulse 1 while the title loop is suspended. Triangle
 ; is silenced too, keeping the requested note phrase clean and unmistakable.
+; Pulse 1 is armed here rather than trusted to the loop's last volume, since
+; the shared theme can leave it at a rest (silenced) when the fanfare fires.
 jukebox_load_step:
         ldx jukebox_step
         lda jukebox_melody_lo,x
         sta APU_PULSE1FTUNE
         lda jukebox_melody_hi,x
         sta APU_PULSE1CTUNE
+        lda #$BF                    ; 50% duty, constant volume 15
+        sta APU_PULSE1CTRL
         lda #$00
         sta APU_TRICTRL1
 jukebox_tick:
@@ -330,7 +290,7 @@ jukebox_tick:
         bne music_done
         lda #0
         sta jukebox_state
-        sta music_step
+        sta _music_step
         lda #$BF                    ; restore the normal loop's pulse voice
         sta APU_PULSE1CTRL
         lda #$9A                    ; and its continuous triangle bass
@@ -424,6 +384,41 @@ _music_sfx_door:
         sta APU_NOISEFREQ1
         lda #$48                    ; 8 frames, then hardware silences it
         sta APU_NOISEFREQ2
+        rts
+
+; Generic one-shots: bright accept, low deny, and a single ringing bell.
+; All pulse-2 so they never collide with the title theme's pulse 1/triangle.
+_music_sfx_confirm:
+        lda #$9F                    ; bright, constant volume 15
+        sta APU_PULSE2CTRL
+        lda #$00
+        sta APU_PULSE2RAMP
+        lda #$4A                    ; crisp mid-high note
+        sta APU_PULSE2FTUNE
+        lda #$50                    ; 10 frames, then hardware silences it
+        sta APU_PULSE2STUNE
+        rts
+
+_music_sfx_cancel:
+        lda #$96                    ; softened, constant volume 10
+        sta APU_PULSE2CTRL
+        lda #$00
+        sta APU_PULSE2RAMP
+        lda #$A0                    ; lower, "no" note
+        sta APU_PULSE2FTUNE
+        lda #$50                    ; 10 frames, then hardware silences it
+        sta APU_PULSE2STUNE
+        rts
+
+_music_sfx_bell:
+        lda #$9F                    ; bright, constant volume 15
+        sta APU_PULSE2CTRL
+        lda #$00
+        sta APU_PULSE2RAMP
+        lda #$30                    ; high, clean ding
+        sta APU_PULSE2FTUNE
+        lda #$78                    ; 15 frames: a slightly longer ring
+        sta APU_PULSE2STUNE
         rts
 
 ; The pickup is the only effect needing a second timed note. NMI advances it

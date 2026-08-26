@@ -13,6 +13,7 @@
         .export         _mmc3_select_prg_pair
         .export         _mmc3_call_mapped_scene
         .export         _banked_scene_arg
+        .export         _random_seed
 
         .import         initlib, donelib, callmain
         .import         zerobss, copydata
@@ -116,6 +117,18 @@ _mmc3_select_prg_pair:
 _mmc3_call_mapped_scene:
         jsr     $8000
         rts
+
+; Returns a fresh per-game seed byte in A. The free-running vblank frame
+; counter is the NES's only genuinely non-repeatable entropy source: which
+; frame an action lands on depends on the player's timing, which varies
+; every run. Mixing the low and high bytes spreads the 16-bit counter across
+; the byte range.
+_random_seed:
+        lda     tickcount
+        eor     tickcount+1
+        bne     :+
+        lda     #1              ; never hand back the LFSR's zero fixed point
+:       rts
 
 .segment "BSS"
 _banked_scene_arg:

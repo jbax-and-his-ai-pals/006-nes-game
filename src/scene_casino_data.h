@@ -5,6 +5,7 @@
 
 extern const char casino_sign_text[];
 extern const char casino_blackjack_text[];
+extern const char casino_roulette_text[];
 extern const char casino_exit_text[];
 extern const char casino_slots_text[];
 extern const char casino_credits_text[];

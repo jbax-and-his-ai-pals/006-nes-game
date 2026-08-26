@@ -140,3 +140,8 @@ void show_traffic_death(void)
 {
     show_traffic_death_message("YOU CAN'T JUST WALK", "INTO TRAFFIC.");
 }
+
+void show_broke_death(void)
+{
+    show_traffic_death_message("YOU LOST IT ALL.", "THE HOUSE WINS.");
+}

@@ -1,8 +1,10 @@
 #include <nes.h>
 
+#include "font.h"
 #include "mmc3.h"
 #include "music.h"
 #include "v2_dialogue.h"
+#include "v2_drink.h"
 #include "v2_game_state.h"
 #include "v2_inventory.h"
 #include "v2_player_actor.h"
@@ -10,6 +12,8 @@
 #include "v2_runtime.h"
 #include "v2_scene_bar.h"
 #include "v2_scene_ui.h"
+#include "v2_traffic.h"
+#include "v2_vram_queue.h"
 
 #define JIMBLES_TILE_TOP 61
 #define JIMBLES_TILE_BOTTOM 62
@@ -32,6 +36,55 @@
 #define BAR_TILE_DOOR_JAMB 244
 #define BAR_TILE_DOOR_FILL 245
 #define TOKEN_TILE 255
+
+/* Chugging-challenge tiles: chr.s's tile 3 is solid index 3 -- the liquid
+ * and the foam, a single tile whose color is decided by the palette that
+ * attributes the cell (amber for beer, white for the head). FONT_TILE_BASE
+ * (8) is a solid index-2 tile that renders palette slot 2 (black panel fill
+ * and empty glass); box_border's rules draw the white frame (index 1 lines
+ * over an index-2 field that matches the fill).
+ *
+ * The panel deliberately does NOT use background palette 1. The shared
+ * message box rewrites palette 1 to its own blue/green scheme (see
+ * show_message_box), so a panel drawn in palette 1 turned blue and green
+ * the instant the post-game message appeared. Palette 2 owns the panel body
+ * and the amber liquid; palette 3 owns the white text and the white foam.
+ * Palettes 0 (the bar's wood) and 1 (the message box) are left untouched. */
+#define DRINK_FONT_BASE 8
+#define DRINK_FILL_TILE 8
+#define DRINK_LIQUID_TILE 3
+#define DRINK_FRAME_H_TILE 52
+#define DRINK_FRAME_V_TILE 53
+#define DRINK_PAL_BODY 2
+#define DRINK_PAL_FOAM 3
+#define DRINK_PANEL_TOP 8
+#define DRINK_PANEL_LEFT 4
+#define DRINK_PANEL_WIDTH 24
+#define DRINK_PANEL_HEIGHT 16
+/* The panel spans rows 8-23 and cols 4-27, which aligns exactly to NES
+ * attribute blocks 2-5 (rows) and 1-6 (cols); an attribute byte covers a
+ * 4x4 tile block here. Rows 8-11 (header), 12-15 (foam), and 20-23 (status
+ * text) are palette 3 (white ink); rows 16-19 hold the amber liquid and use
+ * palette 2. */
+#define DRINK_ATTR_ROW_FIRST 2
+#define DRINK_ATTR_ROW_LAST 5
+#define DRINK_ATTR_COL_FIRST 1
+#define DRINK_ATTR_COL_LAST 6
+#define DRINK_GLASS_LEFT 15
+#define DRINK_GLASS_RIGHT 20
+#define DRINK_GLASS_RIM_ROW 11
+#define DRINK_GLASS_BOTTOM_ROW 20
+#define DRINK_INTERIOR_LEFT 16
+#define DRINK_INTERIOR_RIGHT 19
+#define DRINK_INTERIOR_TOP 12
+#define DRINK_INTERIOR_BOTTOM 19
+/* Status rows inside the panel (rows 8-23). */
+#define DRINK_CONTROLS_ROW 21
+#define DRINK_POKE_ROW 22
+/* Palette 2 slot 3, the amber liquid's color. Queue writes here mid-frame
+ * so the beer visibly darkens as it warms without blanking the screen. */
+#define DRINK_WARMTH_COLOR_ADDR 0x3F0B
+#define DRINK_DEATH_PAUSE_FRAMES 90
 
 #define token_taken game_state.token_taken
 #define has_token game_state.has_token
@@ -64,27 +117,9 @@ static void draw_jimbles(void)
 /* Two short, slumped regulars: they only need head-and-shoulder tiles while
  * standing in the crowded corner, so the lower half stays visually buried in
  * the dark floor/puddle rather than consuming another four OAM slots each. */
-/* Sitting on the floor by the jukebox -- see run_bar_interior() for the
- * walk-over pickup and the jukebox-proximity spend. Static once drawn
- * (like Jimbles), not redrawn every frame, since nothing about it
- * animates; the pickup just hides its one OAM slot directly.
- *
- * Deliberately well clear of the jukebox's own interact zone (x 8-48,
- * y 88-128, in run_bar_interior()) -- picking the token up used to also
- * satisfy the jukebox's has_token/proximity/A check in the very same
- * frame, since the two zones overlapped, so the fanfare played the
- * instant you grabbed it instead of waiting for an actual visit to the
- * jukebox. Also clear of the bar counter's collision block (x 56-199,
- * y 40-87), and clear of the message box's own footprint (rows 19-26,
- * y 152-215) so picking it up doesn't leave it sitting under its own
- * popup. */
-#define TOKEN_X 200
-#define TOKEN_Y 110
-#define TOKEN_OAM_SLOT 42
-static void draw_token(void)
-{
-    set_oam_sprite(TOKEN_OAM_SLOT, TOKEN_X, TOKEN_Y, TOKEN_TILE, 2);
-}
+/* The jukebox token is a reward from winning Jimbles's chugging challenge
+ * (see the Jimbles block in run_bar_interior()), not a floor pickup, so
+ * there is no token sprite to draw or position. */
 
 static void show_bar_interior(void)
 {
@@ -216,11 +251,9 @@ static void show_bar_interior(void)
     draw_jimbles();
     draw_bar_patron();
     draw_regulars();
-    if (!token_taken) draw_token();
-    /* Flush the freshly-cleared-plus-Jimbles(-plus-token) buffer to the
-     * real PPU OAM before rendering resumes -- see show_neon_avenue()'s
-     * comment on the same call for why clear_sprites() alone isn't
-     * enough. */
+    /* Flush the freshly-cleared-plus-Jimbles buffer to the real PPU OAM
+     * before rendering resumes -- see show_neon_avenue()'s comment on the
+     * same call for why clear_sprites() alone isn't enough. */
     oam_flush();
     reset_scroll();
     PPU.mask = 0x1E;
@@ -234,6 +267,332 @@ static void show_bar_message(const char *line1, const char *line2,
     dialogue_set_palette(1);
     show_message_box(line1, line2, line3);
     dialogue_set_palette(3);
+}
+
+/* ------------------------------------------------------------------ */
+/* Jimbles's chugging challenge. Turn-based: five drinks, two settles.
+ * Rules live in v2_drink.c (host-tested exhaustively); everything here
+ * is presentation -- the glass panel, the foam/liquid tiles, the warmth
+ * color shift, and the fail tableaus. Spilling or letting the beer go
+ * warm hands off to bar_corner_death() below and the scene returns
+ * BAR_EXIT_DEATH, the same respawn contract as the avenue's taxi death. */
+
+static unsigned char drink_warm_color(unsigned char warmth)
+{
+    /* Amber, then brown, then murky -- the liquid visibly dying. */
+    if (warmth == 0) return 0x27;
+    if (warmth == 1) return 0x16;
+    return 0x06;
+}
+
+/* The tile for one interior row, top-down (p 0..7 = glass rows 12..19).
+ * Rows 0-3 (12-15) are the foam zone, drawn in palette DRINK_PAL_FOAM where
+ * index 3 is solid white; rows 4-7 (16-19) are the liquid zone, drawn in
+ * palette DRINK_PAL_BODY where index 3 is amber. Both fill bottom-aligned.
+ * A full pour (5 units) also puts one white "head" row at row 15, the bottom
+ * of the foam zone, so a full beer reads as a thin white head on four amber
+ * rows and the first gulp visibly drops that head. */
+static unsigned char drink_row_tile(unsigned char foam, unsigned char liquid,
+                                    unsigned char p)
+{
+    if (p < 4) {
+        unsigned char rows = foam > 4 ? 4 : foam;
+
+        if (p >= (unsigned char)(4 - rows)) return DRINK_LIQUID_TILE;
+        if (p == 3 && liquid >= 5) return DRINK_LIQUID_TILE;
+        return DRINK_FILL_TILE;
+    }
+    {
+        unsigned char rows = liquid > 4 ? 4 : liquid;
+
+        if (p >= (unsigned char)(8 - rows)) return DRINK_LIQUID_TILE;
+        return DRINK_FILL_TILE;
+    }
+}
+
+static void drink_fill_row_direct(unsigned char row, unsigned char tile)
+{
+    unsigned char col;
+
+    PPU.vram.address = (unsigned char)(0x20 + (row >> 3));
+    PPU.vram.address = (unsigned char)((row << 5) + DRINK_INTERIOR_LEFT);
+    for (col = DRINK_INTERIOR_LEFT; col <= DRINK_INTERIOR_RIGHT; ++col) {
+        PPU.vram.data = tile;
+    }
+}
+
+static void drink_queue_row(unsigned char row, unsigned char tile)
+{
+    unsigned char col;
+
+    for (col = DRINK_INTERIOR_LEFT; col <= DRINK_INTERIOR_RIGHT; ++col) {
+        (void)vram_queue_tile(row, col, tile);
+    }
+}
+
+/* Fixed-width 22-tile status line on DRINK_POKE_ROW. Overwriting in place
+ * means a short poke never leaves trailing glyphs from a longer one. */
+static void drink_queue_poke(const char *text)
+{
+    unsigned char i;
+
+    for (i = 0; i < 22; ++i) {
+        unsigned char tile = DRINK_FILL_TILE;
+
+        if (text[i]) tile = (unsigned char)(DRINK_FONT_BASE + font_glyph_index(text[i]));
+        (void)vram_queue_tile(DRINK_POKE_ROW, (unsigned char)(5 + i), tile);
+    }
+}
+
+/* Re-queue only the glass rows whose tile changed; a full 32-tile interior
+ * redraw would overflow the queue mid-frame (the warmth write and the poke
+ * share the same 32-entry budget as the glass itself). */
+static void drink_update_glass(const DrinkState *drink, unsigned char *prev_foam,
+                               unsigned char *prev_liquid)
+{
+    unsigned char new_foam = drink->foam;
+    unsigned char new_liquid = drink->liquid;
+    unsigned char row;
+
+    for (row = DRINK_INTERIOR_TOP; row <= DRINK_INTERIOR_BOTTOM; ++row) {
+        unsigned char p = (unsigned char)(row - DRINK_INTERIOR_TOP);
+
+        if (drink_row_tile(*prev_foam, *prev_liquid, p) !=
+            drink_row_tile(new_foam, new_liquid, p)) {
+            drink_queue_row(row, drink_row_tile(new_foam, new_liquid, p));
+        }
+    }
+    *prev_foam = new_foam;
+    *prev_liquid = new_liquid;
+}
+
+static void drink_pause_frames(unsigned char frames)
+{
+    while (frames--) {
+        waitvsync();
+        oam_flush();
+        reset_scroll();
+    }
+}
+
+static void drink_show_spill(void)
+{
+    unsigned char row, col;
+
+    /* The head is already at the brim (a 3rd consecutive drink pushes foam
+     * past 4, filling the foam zone). Crest it over the rim and spill a
+     * solid white row onto the header above. */
+    for (row = DRINK_INTERIOR_TOP; row < (unsigned char)(DRINK_INTERIOR_TOP + 4); ++row) {
+        drink_queue_row(row, DRINK_LIQUID_TILE);
+    }
+    drink_pause_frames(2);
+    for (col = DRINK_GLASS_LEFT; col <= DRINK_GLASS_RIGHT; ++col) {
+        (void)vram_queue_tile(DRINK_GLASS_RIM_ROW, col, DRINK_LIQUID_TILE);
+        (void)vram_queue_tile((unsigned char)(DRINK_GLASS_RIM_ROW - 1), col, DRINK_LIQUID_TILE);
+    }
+    drink_pause_frames(2);
+    for (col = 14; col < 22; ++col) {
+        (void)vram_queue_tile(DRINK_CONTROLS_ROW, col, PISS_TILE_PUDDLE);
+    }
+    drink_pause_frames(2);
+    drink_queue_poke("YOU SPILLED THE BEER.");
+    drink_pause_frames(DRINK_DEATH_PAUSE_FRAMES);
+}
+
+static void drink_show_snatch(void)
+{
+    /* Jimbles's hand comes down on the glass; the beer stays amber but the
+     * status line sells the moment before the banishment sequence. */
+    drink_pause_frames(2);
+    drink_queue_poke("JIMBLES SNATCHES IT.");
+    drink_pause_frames(DRINK_DEATH_PAUSE_FRAMES);
+}
+
+static void drink_queue_warmth(unsigned char warmth)
+{
+    /* Palette write through the batch API: vram_queue_address itself gets
+     * inlined away inside the fixed engine, but the batch trio is retained
+     * (the dialogue panel builder uses it), so this always has an address
+     * to jump to. */
+    (void)vram_queue_batch_begin();
+    (void)vram_queue_batch_address(DRINK_WARMTH_COLOR_ADDR, drink_warm_color(warmth));
+    (void)vram_queue_batch_commit();
+}
+
+/* The panel: forced-blank redraw like show_bar_interior(), then the chug
+ * loop keeps the screen on and pushes only tile/palette deltas through the
+ * NMI queue. Palette 1 owns the panel -- see the DRINK_* tile defines for
+ * why slot 2 is black fill and slot 3 is the shiftable liquid color. */
+static void draw_drink_panel(const DrinkState *drink)
+{
+    unsigned char c, row;
+
+    PPU.mask = 0;
+    /* Palette 2: panel body + amber liquid. Palette 3: white text + white
+     * foam. Palettes 1 (the message box) and 0 (the bar's wood) are left
+     * untouched so the post-game box keeps its blue/green and the bar behind
+     * the panel keeps its own look. */
+    PPU.vram.address = 0x3F;
+    PPU.vram.address = 0x08;
+    PPU.vram.data = 0x0F;   /* backdrop: black */
+    PPU.vram.data = 0x2A;   /* frame lines: white */
+    PPU.vram.data = 0x0F;   /* panel fill + empty glass: black */
+    PPU.vram.data = drink_warm_color(drink->warmth);   /* liquid amber (shifts) */
+    PPU.vram.address = 0x3F;
+    PPU.vram.address = 0x0C;
+    PPU.vram.data = 0x0F;   /* backdrop: black */
+    PPU.vram.data = 0x2A;   /* frame lines: white */
+    PPU.vram.data = 0x0F;   /* foam-zone fill + empty glass: black */
+    PPU.vram.data = 0x30;   /* text + foam: white */
+    draw_title_plate(DRINK_PANEL_TOP, DRINK_PANEL_LEFT,
+                     DRINK_PANEL_WIDTH, DRINK_PANEL_HEIGHT);
+    for (c = DRINK_ATTR_COL_FIRST; c <= DRINK_ATTR_COL_LAST; ++c) {
+        set_attribute_block(2, c, DRINK_PAL_FOAM);
+        set_attribute_block(3, c, DRINK_PAL_FOAM);
+        set_attribute_block(4, c, DRINK_PAL_BODY);
+        set_attribute_block(5, c, DRINK_PAL_FOAM);
+    }
+    draw_text(9, 5, "FIRST ONE'S ON THE");
+    draw_text(10, 5, "HOUSE, PAL. DRINK UP!");
+    /* Glass frame. */
+    for (c = DRINK_GLASS_LEFT; c <= DRINK_GLASS_RIGHT; ++c) {
+        set_tile(DRINK_GLASS_RIM_ROW, c, DRINK_FRAME_H_TILE);
+        set_tile(DRINK_GLASS_BOTTOM_ROW, c, DRINK_FRAME_H_TILE);
+    }
+    for (row = DRINK_INTERIOR_TOP; row <= DRINK_INTERIOR_BOTTOM; ++row) {
+        set_tile(row, DRINK_GLASS_LEFT, DRINK_FRAME_V_TILE);
+        set_tile(row, DRINK_GLASS_RIGHT, DRINK_FRAME_V_TILE);
+    }
+    /* Initial pour: five liquid rows (the top one renders white as a thin
+     * head), no foam. */
+    for (row = DRINK_INTERIOR_TOP; row <= DRINK_INTERIOR_BOTTOM; ++row) {
+        unsigned char p = (unsigned char)(row - DRINK_INTERIOR_TOP);
+
+        drink_fill_row_direct(row, drink_row_tile(0, drink->liquid, p));
+    }
+    draw_text(DRINK_CONTROLS_ROW, 6, "A: DRINK   B: SETTLE");
+    clear_sprites();
+    oam_flush();
+    reset_scroll();
+    PPU.mask = 0x1E;
+}
+
+/* The full modal: owns the frame loop while the chug is in progress, like
+ * run_inventory() does for the inventory screen. Returns the DRINK_RESULT_*;
+ * the caller decides the win handoff or the corner banishment. */
+static unsigned char drink_beer_minigame(void)
+{
+    DrinkState drink;
+    unsigned char pad = 0;
+    unsigned char prev_pad = 0;
+    unsigned char prev_foam = 0;
+    unsigned char prev_liquid = 0;
+    unsigned char poke = 0;
+    unsigned char result;
+
+    drink_init(&drink);
+    draw_drink_panel(&drink);
+    prev_foam = drink.foam;
+    prev_liquid = drink.liquid;
+    /* Seed prev_pad from the live state so the A that opened the chug (or a
+     * held button) doesn't read as a fresh press on the first round: each
+     * drink/settle needs a deliberate press-and-release, so you can't just
+     * hold A to chug the whole pint. */
+    prev_pad = read_pad();
+    for (;;) {
+        waitvsync();
+        reset_scroll();
+        oam_flush();
+        pad = read_pad();
+        if ((pad & PAD_A) && !(prev_pad & PAD_A)) {
+            result = drink_take(&drink);
+            music_sfx_pickup();
+            drink_update_glass(&drink, &prev_foam, &prev_liquid);
+            if (result != DRINK_RESULT_ACTIVE) break;
+        } else if ((pad & PAD_B) && !(prev_pad & PAD_B)) {
+            result = drink_settle(&drink);
+            drink_update_glass(&drink, &prev_foam, &prev_liquid);
+            drink_queue_warmth(drink.warmth);
+            if (result != DRINK_RESULT_ACTIVE) break;
+            if (drink.warmth == 1 && poke != 1) {
+                poke = 1;
+                drink_queue_poke("JIMBLES TAPS HIS FINGER.");
+            } else if (drink.warmth == 2 && poke != 2) {
+                poke = 2;
+                drink_queue_poke("JIMBLES: ADMIRING IT?");
+            }
+        }
+        prev_pad = pad;
+    }
+    if (drink.result == DRINK_RESULT_SPILL) {
+        music_sfx_hurt();
+        drink_show_spill();
+    } else if (drink.result == DRINK_RESULT_SNATCH) {
+        drink_show_snatch();
+    }
+    return drink.result;
+}
+
+static unsigned char bar_death_centered_col(const char *text)
+{
+    unsigned char length = 0;
+
+    while (text[length]) ++length;
+    return (unsigned char)((32 - length) >> 1);
+}
+
+/* A three-line banishment plate, drawn with the active dialogue palette
+ * (palette 1, the same blue/green as the shared message box) so the
+ * post-game death reads as part of the bar's normal dialogue system.
+ * Mirrors show_traffic_death_message() but the punishment line runs to a
+ * third row, since "JIMBLES: PISS CORNER. NOW." is too wide for one. */
+static void bar_death_plate(const char *line1, const char *line2, const char *line3)
+{
+    unsigned char i;
+    unsigned char palette = dialogue_get_palette();
+
+    PPU.mask = 0;
+    PPU.vram.address = 0x3F;
+    PPU.vram.address = (unsigned char)(palette << 2);
+    PPU.vram.data = 0x0F;
+    PPU.vram.data = 0x2A;
+    PPU.vram.data = 0x01;
+    PPU.vram.data = 0x30;
+    draw_title_plate(12, 4, 24, 8);
+    for (i = 1; i < 7; ++i) {
+        set_attribute_block(3, i, palette);
+        set_attribute_block(4, i, palette);
+    }
+    draw_text(14, bar_death_centered_col(line1), line1);
+    draw_text(16, bar_death_centered_col(line2), line2);
+    draw_text(18, bar_death_centered_col(line3), line3);
+    reset_scroll();
+    PPU.mask = 0x1E;
+}
+
+/* The banishment: the corner regulars welcome their newest member, then the
+ * death plate, then the same release-and-press-A respawn as the taxi death. */
+static void bar_corner_death(const char *line1, const char *line2, const char *line3)
+{
+    unsigned char pad = 0;
+    unsigned char released = 0;
+
+    show_bar_message("ANOTHER SPILLER.", "WELCOME TO THE CLUB.", 0);
+    show_bar_interior();
+    dialogue_set_palette(1);
+    bar_death_plate(line1, line2, line3);
+    dialogue_set_palette(3);
+    for (;;) {
+        waitvsync();
+        oam_flush();
+        reset_scroll();
+        pad = read_pad();
+        if (!(pad & PAD_A)) {
+            if (released < 4) ++released;
+        } else if (released >= 4) {
+            return;
+        }
+    }
 }
 
 /* The bar counter/shelf/patron block (rows 5-9, cols 8-23 -- see
@@ -388,16 +747,9 @@ unsigned char run_bar_interior(unsigned char arrival)
             walk_frame = 0;
         }
 
-        /* Zelda-style walk-over pickup, no button -- same feel as the
-         * old adventure's items. */
-        if (!token_taken && x >= TOKEN_X - 12 && x <= TOKEN_X + 12 &&
-            y >= TOKEN_Y - 12 && y <= TOKEN_Y + 12) {
-            token_taken = 1;
-            has_token = 1;
-            oam_buf[TOKEN_OAM_SLOT * 4] = 0xFF;
-            show_bar_message("YOU FOUND A JUKEBOX", "TOKEN.", 0);
-            show_bar_interior();
-        }
+        /* The jukebox token is a reward from winning Jimbles's chugging
+         * challenge (see the Jimbles block), not a walk-over floor pickup,
+         * so there's no floor sprite to pick up here. */
         /* Spend it standing near the jukebox. Position-gated like the
          * door lock above: holding A in the zone shows a message exactly
          * once per approach, not once per frame A reads as held (or per
@@ -414,7 +766,8 @@ unsigned char run_bar_interior(unsigned char arrival)
                      * statement of it -- the click is the mechanism, the
                      * player connects the dots on the next locked-door
                      * message (or just by trying the door). */
-                    show_bar_message("THE JUKEBOX ROARS", "TO LIFE... CLICK.", 0);
+                    show_bar_message("THE JUKEBOX ROARS", "TO LIFE... CLICK.",
+                                     "DID SOMETHING UNLOCK?");
                 } else {
                     show_bar_message("THE JUKEBOX NEEDS", "A TOKEN.", 0);
                 }
@@ -433,18 +786,37 @@ unsigned char run_bar_interior(unsigned char arrival)
          * further left so it can't overlap the patron's zone just below. */
         if (x >= 104 && x <= 156 && y >= 88 && y <= 112) {
             if ((pad & PAD_A) && !jimbles_prompted) {
+                unsigned char drink_result;
+
                 jimbles_prompted = 1;
                 if (!has_beer) {
-                    has_beer = 1;
-                    show_bar_message("JIMBLES: FIRST ONE'S", "ON THE HOUSE, PAL.",
-                                     "HE HANDS YOU A BEER.");
+                    /* The chugging challenge replaces the instant handoff:
+                     * win and he slides a beer across for the road; spill
+                     * or let it go warm and it's Piss Corner -- see
+                     * bar_corner_death() and BAR_EXIT_DEATH. */
+                    drink_result = drink_beer_minigame();
+                    if (drink_result == DRINK_RESULT_WIN) {
+                        has_beer = 1;
+                        has_token = 1;
+                        show_bar_message("THAT'S THE STUFF, PAL.", "HE HANDS YOU A BEER",
+                                         "AND A JUKEBOX TOKEN.");
+                        show_bar_interior();
+                    } else {
+                        bar_corner_death(drink_result == DRINK_RESULT_SPILL
+                                             ? "YOU SPILLED THE BEER."
+                                             : "YOU LET IT GO WARM.",
+                                         "JIMBLES: PISS",
+                                         "CORNER. NOW.");
+                        return BAR_EXIT_DEATH;
+                    }
                 } else if (!jimbles_limit_given) {
                     jimbles_limit_given = 1;
                     show_bar_message("JIMBLES: ONE'S YOUR", "LIMIT, PAL.", 0);
+                    show_bar_interior();
                 } else {
                     show_bar_message("JIMBLES: EVERYONE", "HERE'S A FUCKING", "SLUG.");
+                    show_bar_interior();
                 }
-                show_bar_interior();
             }
         } else {
             jimbles_prompted = 0;

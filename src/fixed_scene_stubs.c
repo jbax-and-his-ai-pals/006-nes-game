@@ -21,6 +21,10 @@ extern volatile unsigned char banked_scene_arg;
 #include "v2_traffic.h"
 #include "v2_vram_queue.h"
 
+/* Recorded by each scene-entry stub: the first PRG bank it maps. music_select_song
+ * briefly maps the music bank to cache a song, then restores this bank. */
+extern unsigned char music_scene_bank;
+
 #ifdef __NES__
 #pragma code-name ("FIXED_ENGINE")
 #pragma rodata-name ("FIXED_ENGINE_RODATA")
@@ -37,7 +41,17 @@ static void keep_scene_api(void)
     mmc3_use_park_chr();
     mmc3_use_casino_cards_chr();
     mmc3_use_sewer_chr();
+    /* The banked casino/commentarium seed their RNGs from the frame counter;
+     * keep this fixed-engine entry point alive for them. */
+    random_seed();
     music_sfx_hurt();
+    /* The bar scene's chugging challenge uses the pickup blip per gulp.
+     * Keep it alive like the other scene-facing effects. */
+    music_sfx_pickup();
+    /* Generic UI/notification effects kept callable from any banked scene. */
+    music_sfx_confirm();
+    music_sfx_cancel();
+    music_sfx_bell();
     music_select_song(MUSIC_SONG_AVENUE);
     music_play_jukebox_fanfare();
     clear_sprites();
@@ -70,6 +84,8 @@ static void keep_scene_api(void)
     (void)dialogue_get_palette();
     show_traffic_death();
     show_traffic_death_message("", "");
+    /* The casino's broke game-over reuses the shared death plate. */
+    show_broke_death();
     vram_queue_clear();
     run_inventory();
     /* v2_casino.c (blackjack/poker/slot game logic) lives in the casino
@@ -87,14 +103,15 @@ unsigned char run_neon_avenue(unsigned char arrival)
 {
     if (fixed_api_probe) keep_scene_api();
     banked_scene_arg = arrival;
+    music_scene_bank = 5;
     mmc3_select_prg_pair(5);
     return mmc3_call_mapped_scene();
 }
-unsigned char run_bar_interior(unsigned char from_casino) { banked_scene_arg = from_casino; mmc3_select_prg_pair(7); return mmc3_call_mapped_scene(); }
-void run_casino(void) { mmc3_select_prg_pair(13); mmc3_call_mapped_scene(); }
-unsigned char run_mart_exterior(unsigned char from_mart) { banked_scene_arg = from_mart; mmc3_select_prg_pair(9); return mmc3_call_mapped_scene(); }
-void run_mart_interior(void) { banked_scene_arg = 2; mmc3_select_prg_pair(9); mmc3_call_mapped_scene(); }
-unsigned char run_park(void) { mmc3_select_prg_pair(3); return mmc3_call_mapped_scene(); }
-unsigned char run_sewer(void) { mmc3_select_prg_pair(11); return mmc3_call_mapped_scene(); }
-unsigned char run_zoo(void) { mmc3_select_prg_pair(15); return mmc3_call_mapped_scene(); }
-void run_commentarium(void) { mmc3_select_prg_pair(17); mmc3_call_mapped_scene(); }
+unsigned char run_bar_interior(unsigned char from_casino) { banked_scene_arg = from_casino; music_scene_bank = 7; mmc3_select_prg_pair(7); return mmc3_call_mapped_scene(); }
+unsigned char run_casino(void) { music_scene_bank = 13; mmc3_select_prg_pair(13); return mmc3_call_mapped_scene(); }
+unsigned char run_mart_exterior(unsigned char from_mart) { banked_scene_arg = from_mart; music_scene_bank = 9; mmc3_select_prg_pair(9); return mmc3_call_mapped_scene(); }
+void run_mart_interior(void) { banked_scene_arg = 2; music_scene_bank = 9; mmc3_select_prg_pair(9); mmc3_call_mapped_scene(); }
+unsigned char run_park(void) { music_scene_bank = 3; mmc3_select_prg_pair(3); return mmc3_call_mapped_scene(); }
+unsigned char run_sewer(void) { music_scene_bank = 11; mmc3_select_prg_pair(11); return mmc3_call_mapped_scene(); }
+unsigned char run_zoo(void) { music_scene_bank = 15; mmc3_select_prg_pair(15); return mmc3_call_mapped_scene(); }
+void run_commentarium(void) { music_scene_bank = 17; mmc3_select_prg_pair(17); mmc3_call_mapped_scene(); }

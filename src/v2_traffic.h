@@ -11,5 +11,7 @@ void draw_crash_tableau(unsigned char x, unsigned char moving_left);
 void set_traffic_crash_oam_base(unsigned char first_slot);
 void show_traffic_death(void);
 void show_traffic_death_message(const char *line1, const char *line2);
+/* "You lost it all" broke game-over plate (also used by the Casino scene). */
+void show_broke_death(void);
 
 #endif

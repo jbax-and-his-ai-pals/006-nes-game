@@ -124,7 +124,7 @@ static void casino_blackjack_resolve(CasinoState *casino)
 
 void casino_reset(CasinoState *casino)
 {
-    casino->credits = 10;
+    casino->credits = 5;             /* real money now; start with $5 */
     casino->bet = 1;
     casino->reel[0] = 0;
     casino->reel[1] = 0;

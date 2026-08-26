@@ -3,6 +3,7 @@
 #include "mmc3.h"
 #include "music.h"
 #include "v2_dialogue.h"
+#include "v2_game_state.h"
 #include "v2_inventory.h"
 #include "v2_player_actor.h"
 #include "v2_regulars.h"
@@ -22,6 +23,8 @@
 #define BAR_TILE_COUNTER 237
 #define BAR_TILE_STOOL 243
 #define FONT_TILE_BASE 8
+#define TOKEN_TILE 255
+#define has_sewer_key game_state.has_sewer_key
 /* Moonlight Park is intentionally a quiet counterpoint to the storefronts:
  * a green, open tableau with a footpath, fountain, bench, and oversized
  * trees. Its isolated CHR page begins as a common-tile clone, so its palette
@@ -34,10 +37,11 @@ static void show_park(void)
          * instead of inheriting the bar's red/brown color language. */
         0x0F, 0x0A, 0x1A, 0x30, 0x0F, 0x0B, 0x19, 0x30,
         0x0F, 0x07, 0x17, 0x30, 0x0F, 0x01, 0x21, 0x30,
-        0x0F, 0x16, 0x27, 0x30, 0x0F, 0x0F, 0x27, 0x30,
-        /* Sprite palette 2 is reserved for the tree trunks: three browns,
-         * no white, so the reused counter tile reads as bark. */
-        0x0F, 0x07, 0x17, 0x27, 0x0F, 0x0F, 0x0F, 0x30
+        0x0F, 0x07, 0x17, 0x27, 0x0F, 0x0F, 0x27, 0x30,
+        /* Sprite palette 0 now carries the tree trunk browns (moved here so
+         * sprite palette 2 is free for the taxi); the taxi palette (2) below
+         * matches the avenue's: red accents, yellow body, white trim. */
+        0x0F, 0x16, 0x28, 0x30, 0x0F, 0x0F, 0x0F, 0x30
     };
     unsigned char i;
 
@@ -55,6 +59,9 @@ static void show_park(void)
     fill_title_rect(4, 25, 6, 5, BAR_TILE_WALL);
     fill_title_rect(16, 2, 5, 4, BAR_TILE_WALL);
     fill_title_rect(17, 26, 4, 4, BAR_TILE_WALL);
+    /* The sewer key is tucked up inside the top-right treetop's canopy, so
+     * you have to walk up behind the foliage to spot it. */
+    if (!has_sewer_key) set_tile(5, 27, TOKEN_TILE);
     draw_text(1, 9, "MOONLIGHT PARK");
     /* Blue pond with a small round fountain in its center. */
     fill_title_rect(7, 11, 10, 7, NEON_TILE_WINDOW_FILL);
@@ -112,17 +119,19 @@ static void draw_park_trunks(void)
 {
     unsigned char row;
 
-    /* The font's solid fill tile takes sprite palette 2's bark brown,
-     * producing simple, fully opaque 16x40 trunks without canopy colors. */
+    /* The font's solid fill tile takes sprite palette 0's bark brown,
+     * producing simple, fully opaque 16x40 trunks without canopy colors.
+     * (Palette 0, not 2: sprite palette 2 is the taxi's, so the trees no
+     * longer recolor the taxi when it drives through the park.) */
     for (row = 0; row < 5; ++row) {
         set_oam_sprite((unsigned char)(44 + row * 2), 24,
-                       (unsigned char)(64 + row * 8), FONT_TILE_BASE, 2);
+                       (unsigned char)(64 + row * 8), FONT_TILE_BASE, 0);
         set_oam_sprite((unsigned char)(45 + row * 2), 32,
-                       (unsigned char)(64 + row * 8), FONT_TILE_BASE, 2);
+                       (unsigned char)(64 + row * 8), FONT_TILE_BASE, 0);
         set_oam_sprite((unsigned char)(54 + row * 2), 216,
-                       (unsigned char)(72 + row * 8), FONT_TILE_BASE, 2);
+                       (unsigned char)(72 + row * 8), FONT_TILE_BASE, 0);
         set_oam_sprite((unsigned char)(55 + row * 2), 224,
-                       (unsigned char)(72 + row * 8), FONT_TILE_BASE, 2);
+                       (unsigned char)(72 + row * 8), FONT_TILE_BASE, 0);
     }
 }
 
@@ -197,7 +206,7 @@ unsigned char run_park(void)
     unsigned char taxi_moving_left = 0;
     unsigned char death_released = 0;
     int taxi_x = 0;
-    music_select_song(MUSIC_SONG_PARK);
+    music_select_song(MUSIC_SONG_BAR);
     show_park();
     /* Keep a distinct ambient stream. Music remains NMI-clocked. */
     reset_park_regulars();
@@ -258,34 +267,48 @@ unsigned char run_park(void)
         } else if (pad & PAD_DOWN) {
             if (y < 216 && !park_blocks(x, (unsigned char)(y + 1))) ++y;
         }
+        /* The sewer key is hidden up in the top-right treetop's canopy, so
+         * this only triggers on the narrow walk-behind stretch -- you have to
+         * go up behind the foliage rather than brush the tree's base. */
+        if (!has_sewer_key && x >= 200 && x <= 248 && y >= 38 && y <= 52) {
+            has_sewer_key = 1;
+            music_sfx_pickup();
+            show_park_message("FOUND A KEY.", "I WONDER WHAT IT", "UNLOCKS?");
+            show_park();
+        }
         if (y >= 214) {
             traffic_state = 1;
             taxi_moving_left = x < 128;
             taxi_x = taxi_moving_left ? 224 : 0;
             hide_park_actors_for_traffic();
         }
-        /* The fountain is solid, so this interaction area includes its full
-         * footprint plus the walkable perimeter at the south edge. */
-        if (x >= 72 && x <= 184 && y >= 40 && y <= 176) {
-            if ((pad & PAD_A) && !fountain_prompted) {
-                fountain_prompted = 1;
-                show_park_message("THE FOUNTAIN IS DRY.", "SOMEBODY STOLE", "THE WATER.");
-                show_park();
-            }
-        }
-        if (park_regular_is_near(0, x, y)) {
-            if ((pad & PAD_A) && !park_regular_one_prompted) {
-                park_regular_one_prompted = 1;
-                show_park_message("I CAME FOR THE", "FOUNTAIN, GIGGITY,",
-                                  "BUT IT'S DRY.");
-                show_park();
-            }
-        }
-        if (park_regular_is_near(1, x, y)) {
-            if ((pad & PAD_A) && !park_regular_two_prompted) {
-                park_regular_two_prompted = 1;
-                show_park_message("THE TREES KNOW", "TOO MUCH.", 0);
-                show_park();
+        /* The fountain and the two regulars share this stretch of the park,
+         * and the fountain's interaction zone is broad enough to overlap the
+         * regulars' spots. So resolve them as one chain with the NPCs taking
+         * precedence: a single A press near a regular shows that regular's
+         * line, and only otherwise does the fountain's dry note play -- never
+         * two messages stacked. */
+        if (pad & PAD_A) {
+            if (park_regular_is_near(0, x, y)) {
+                if (!park_regular_one_prompted) {
+                    park_regular_one_prompted = 1;
+                    show_park_message("I CAME FOR THE", "FOUNTAIN, GIGGITY,",
+                                      "BUT IT'S DRY.");
+                    show_park();
+                }
+            } else if (park_regular_is_near(1, x, y)) {
+                if (!park_regular_two_prompted) {
+                    park_regular_two_prompted = 1;
+                    show_park_message("THE TREES KNOW", "TOO MUCH.", 0);
+                    show_park();
+                }
+            } else if (x >= 72 && x <= 184 && y >= 40 && y <= 176) {
+                if (!fountain_prompted) {
+                    fountain_prompted = 1;
+                    show_park_message("THE FOUNTAIN IS DRY.", "SOMEBODY STOLE",
+                                      "THE WATER.");
+                    show_park();
+                }
             }
         }
         if (pad & (PAD_LEFT | PAD_RIGHT | PAD_UP | PAD_DOWN)) {

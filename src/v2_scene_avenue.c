@@ -178,7 +178,7 @@ unsigned char run_neon_avenue(unsigned char arrival)
     unsigned char death_released = 0;
     int taxi_x = 0;
 
-    music_select_song(MUSIC_SONG_AVENUE);
+    music_select_song(MUSIC_SONG_BAR);
     show_neon_avenue();
     for (;;) {
         waitvsync();

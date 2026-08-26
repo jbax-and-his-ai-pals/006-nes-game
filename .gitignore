@@ -3,3 +3,4 @@
 *.map
 build/
 tests/out/
+tools/__pycache__/

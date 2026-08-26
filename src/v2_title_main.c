@@ -348,6 +348,9 @@ void main(void)
     PPU.control = 0x80;
     show_title_screen();
     music_start();
+    /* The title plays its own banked theme (see src/title_music.s), not the
+     * avenue loop music_start() loads by default. */
+    music_select_song(MUSIC_SONG_TITLE);
     wait_for_title_start();
 
     /* Neon Avenue, the bar, and the casino hand off to each other by
@@ -412,17 +415,39 @@ void main(void)
         }
         v2_set_route(V2_SCENE_BAR, 0);
         bar_exit = run_bar_interior(0);
-        while (bar_exit == BAR_EXIT_COMMENTARIUM) {
-            v2_set_route(V2_SCENE_COMMENTARIUM, 0);
-            run_commentarium();
-            v2_set_route(V2_SCENE_BAR, 2);
-            bar_exit = run_bar_interior(2);
-        }
-        while (bar_exit == BAR_EXIT_CASINO) {
-            v2_set_route(V2_SCENE_CASINO, 0);
-            run_casino();
-            v2_set_route(V2_SCENE_BAR, 1);
-            bar_exit = run_bar_interior(1);
+        /* The bar is a hub, not a chain: exiting to the casino or commentarium
+         * returns to the bar at that sub-room's door, and the player can head
+         * straight on to the other. So loop here and re-check whichever exit
+         * was just used. The old linear three-loop form missed a casino-then-
+         * commentarium hop -- after the casino loop, bar_exit was already
+         * COMMENTARIUM, but that loop sat earlier in the sequence, so it never
+         * ran and the player fell through to the avenue spawn ("outside the
+         * bar"). Only stop once the player leaves through the avenue door. */
+        while (bar_exit != BAR_EXIT_AVENUE) {
+            if (bar_exit == BAR_EXIT_DEATH) {
+                /* Spilled or let the beer go warm: respawn at the bar
+                 * entrance, the same contract as the avenue's taxi death. */
+                bar_exit = run_bar_interior(0);
+            } else if (bar_exit == BAR_EXIT_COMMENTARIUM) {
+                v2_set_route(V2_SCENE_COMMENTARIUM, 0);
+                run_commentarium();
+                v2_set_route(V2_SCENE_BAR, 2);
+                bar_exit = run_bar_interior(2);
+            } else if (bar_exit == BAR_EXIT_CASINO) {
+                v2_set_route(V2_SCENE_CASINO, 0);
+                if (run_casino() == CASINO_EXIT_BROKE) {
+                    /* Gambled it all away: kicked back to the bar's
+                     * avenue entrance, flat broke. */
+                    v2_set_route(V2_SCENE_BAR, 0);
+                    bar_exit = run_bar_interior(0);
+                } else {
+                    v2_set_route(V2_SCENE_BAR, 1);
+                    bar_exit = run_bar_interior(1);
+                }
+            } else {
+                /* No other bar exit code exists; guard against spinning. */
+                break;
+            }
         }
     }
 }

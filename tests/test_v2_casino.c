@@ -21,7 +21,7 @@ int main(void)
     unsigned char payout = 0;
 
     casino_reset(&casino);
-    check_eq("reset credits", casino.credits, 10);
+    check_eq("reset credits", casino.credits, 5);
     check_eq("reset bet", casino.bet, 1);
     check_eq("default reels start as a jackpot", casino_is_winner(&casino), 1);
     /* Reel index 0 is "7" (see casino_slot_symbols[] in

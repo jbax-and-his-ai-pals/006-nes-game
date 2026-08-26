@@ -5,6 +5,7 @@
 #include "music.h"
 #include "scene_casino_data.h"
 #include "v2_casino.h"
+#include "v2_dialogue.h"
 #include "v2_game_state.h"
 #include "v2_input.h"
 #include "v2_inventory.h"
@@ -12,6 +13,7 @@
 #include "v2_runtime.h"
 #include "v2_scene_casino.h"
 #include "v2_scene_ui.h"
+#include "v2_traffic.h"
 #include "v2_vram_queue.h"
 
 #define FONT_TILE_BASE 8
@@ -386,8 +388,12 @@ static void show_casino(void)
      * neon_avenue.s -- see each file's own comment for how those slots
      * were freed) use a bolder stepped cut instead. */
     set_tile(10, 22, 230); set_tile(10, 23, 201); set_tile(10, 24, 201); set_tile(10, 25, 231);
-    set_tile(11, 22, 242); set_tile(11, 23, 207); set_tile(11, 24, 207); set_tile(11, 25, 204);
-    /* Row 7, not row 9 like POKER/SLOTS' labels -- row 9 falls in the same
+    set_tile(11, 22, 242); set_tile(11, 23, 204); set_tile(11, 24, 204); set_tile(11, 25, 204);
+    /* The blackjack felt (204) now matches the roulette's inner-felt layer --
+     * same 201 rail over a 204 inner felt, with the 242 left edge and the
+     * 230/231 stepped corners. (This scene's bank is exactly full, so the
+     * roulette's third, outer-felt 207 band isn't repeated here on purpose.)
+     * Row 7, not row 9 like POKER/SLOTS' labels -- row 9 falls in the same
      * 4-tile attribute band as the table itself (rows 8-11), which the
      * table needs on the green-felt palette. Sharing that band forced the
      * label onto the same white-on-green scheme instead of the room's
@@ -402,15 +408,24 @@ static void show_casino(void)
     set_tile(18, 11, 230); fill_title_rect(18, 12, 8, 1, 201); set_tile(18, 20, 231);
     set_tile(19, 11, 242); fill_title_rect(19, 12, 8, 1, 204); set_tile(19, 20, 204);
     set_tile(20, 11, 242); fill_title_rect(20, 12, 8, 1, 207); set_tile(20, 20, 207);
+    /* Roulette's label sits on row 15, one attribute band up from the table
+     * (rows 16-19 are the felt, palette 1), so it reads in the room's usual
+     * yellow-on-wood like POKER/SLOTS/BLACKJACK instead of the felt palette. */
+    draw_text(15, 12, casino_roulette_text);
 
-    for (i = 0; i < 8; ++i) set_attribute_block(0, i, 0);
-    for (i = 0; i < 8; ++i) set_attribute_block(1, i, 0);
-    for (i = 0; i < 8; ++i) set_attribute_block(2, i, 0);
-    for (i = 0; i < 8; ++i) set_attribute_block(3, i, 0);
-    for (i = 0; i < 8; ++i) set_attribute_block(4, i, 0);
-    for (i = 0; i < 8; ++i) set_attribute_block(5, i, 0);
-    for (i = 0; i < 8; ++i) set_attribute_block(6, i, 0);
-    for (i = 0; i < 8; ++i) set_attribute_block(7, i, 0);
+    /* Reset every attribute cell to palette 0 first, then repaint only the
+     * felt cells below. One loop over the 8 columns, stamping all 8 rows each
+     * pass, instead of eight separate loops -- this scene's bank is full. */
+    for (i = 0; i < 8; ++i) {
+        set_attribute_block(0, i, 0);
+        set_attribute_block(1, i, 0);
+        set_attribute_block(2, i, 0);
+        set_attribute_block(3, i, 0);
+        set_attribute_block(4, i, 0);
+        set_attribute_block(5, i, 0);
+        set_attribute_block(6, i, 0);
+        set_attribute_block(7, i, 0);
+    }
     /* The blackjack table (tile rows 10-11, cols 22-25) sits inside attr
      * row 2, spanning attr cols 5 and 6 -- those switch to palette 1 (see
      * above) so the table reads as wood rail over green felt. Its label
@@ -588,7 +603,7 @@ static void show_casino_game_screen(const char *title)
         for (col = 0; col < 8; ++col) set_attribute_block(row, col, 1);
     }
     draw_text(3, 11, title);
-    draw_text(5, 6, "CRED");
+    draw_text(5, 6, "$");
     draw_digits3(5, 12, casino_credits);
     draw_text(5, 18, "BET");
     draw_digits2(5, 23, casino_bet);
@@ -1243,13 +1258,34 @@ static unsigned char casino_fixture_blocks(unsigned char x, unsigned char y)
     return 0;
 }
 
+/* Broke game-over: reuse the shared traffic-death plate, then the same
+ * release-and-press-A respawn as the other deaths. */
+static void run_casino_broke(void)
+{
+    unsigned char pad = 0;
+    unsigned char released = 0;
+
+    show_broke_death();
+    for (;;) {
+        waitvsync();
+        oam_flush();
+        reset_scroll();
+        pad = read_pad();
+        if (!(pad & PAD_A)) {
+            if (released < 4) ++released;
+        } else if (released >= 4) {
+            return;
+        }
+    }
+}
+
 /* Same flush-first shape as the other two scenes' loops. All three games
  * are their own full-screen modes now (see run_blackjack_game(),
  * run_poker_game(), run_slots_game()); walking the floor just decides
  * which one A enters. There's no button-driven exit from the room itself
  * -- walking into the south door is the only way back to the bar, the
  * same as every other door in this game. */
-void run_casino(void)
+unsigned char run_casino(void)
 {
     unsigned char x = 128;
     unsigned char y = 200;
@@ -1263,7 +1299,10 @@ void run_casino(void)
     unsigned char at_roulette;
     unsigned char a_held = 0, a_run = 0;
 
-    music_select_song(MUSIC_SONG_CASINO);
+    /* The casino and commentarium share the bar's theme; the engine keeps
+     * playing it (rather than restarting) when these rooms hand off to each
+     * other. A custom casino tune will later take its own slot. */
+    music_select_song(MUSIC_SONG_BAR);
     show_casino();
     for (;;) {
         waitvsync();
@@ -1271,6 +1310,12 @@ void run_casino(void)
         oam_flush();
 
         pad = read_pad();
+        if (casino_credits == 0) {
+            /* Gambled the last dollar away: a proper broke game-over,
+             * same release-and-press-A respawn as the other deaths. */
+            run_casino_broke();
+            return CASINO_EXIT_BROKE;
+        }
         if (pad & PAD_UP) facing = PLAYER_FACING_UP;
         else if (pad & PAD_DOWN) facing = PLAYER_FACING_DOWN;
         else if (pad & PAD_LEFT) facing = PLAYER_FACING_LEFT;
@@ -1317,7 +1362,7 @@ void run_casino(void)
                 if (y < 216) {
                     if (!casino_fixture_blocks(x, y + 1)) ++y;
                 } else if (x >= 104 && x <= 144) {
-                    return;
+                    return CASINO_EXIT_OK;
                 }
             }
         }

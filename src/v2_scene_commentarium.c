@@ -241,7 +241,7 @@ void run_commentarium_scene(void) {
     RngState comment_rng;
 
     music_select_song(MUSIC_SONG_BAR);
-    rng_seed(&comment_rng, 0xD7);
+    rng_seed(&comment_rng, random_seed());
     for (i = 0; i < DUMB_COMMENT_COUNT; ++i) {
         comment_order[i] = i;
     }

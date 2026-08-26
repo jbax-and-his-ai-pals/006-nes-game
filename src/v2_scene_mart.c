@@ -125,7 +125,7 @@ unsigned char run_mart_exterior(unsigned char from_mart)
     unsigned char death_released = 0;
     int taxi_x = 0;
 
-    music_select_song(MUSIC_SONG_MART);
+    music_select_song(MUSIC_SONG_BAR);
     show_mart_exterior();
     for (;;) {
         waitvsync();
@@ -297,7 +297,7 @@ void run_mart_interior(void)
     unsigned char shelf_prompted = 0;
     unsigned char shelf_dialogue = 0;
 
-    music_select_song(MUSIC_SONG_MART);
+    music_select_song(MUSIC_SONG_BAR);
 
     show_mart_interior();
     for (;;) {
@@ -379,8 +379,13 @@ void run_mart_interior(void)
             if ((pad & PAD_A) && !shelf_prompted) {
                 shelf_prompted = 1;
                 if (!game_state.has_flamethrower) {
-                    game_state.has_flamethrower = 1;
-                    show_mart_message("BEHIND THE MOPS:", "A FLAMETHROWER.", "SEEMS LEGIT.");
+                    if (game_state.casino.credits >= 50) {
+                        game_state.casino.credits -= 50;
+                        game_state.has_flamethrower = 1;
+                        show_mart_message("BEHIND THE MOPS:", "A FLAMETHROWER. $50.", "IT'S YOURS.");
+                    } else {
+                        show_mart_message("BEHIND THE MOPS:", "A FLAMETHROWER. $50.", "COME BACK RICHER.");
+                    }
                 } else if (shelf_dialogue == 0) {
                     show_mart_message("SOME KIND OF", "MYSTERY PUDDING.", 0);
                 } else if (shelf_dialogue == 1) {

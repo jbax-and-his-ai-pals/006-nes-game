@@ -6,6 +6,8 @@ if errorlevel 1 exit /b 1
 
 call "%~dp0build_scene_park.bat"
 if errorlevel 1 exit /b 1
+call "%~dp0build_park_chr.bat"
+if errorlevel 1 exit /b 1
 call "%~dp0build_scene_avenue.bat"
 if errorlevel 1 exit /b 1
 call "%~dp0build_scene_bar.bat"
@@ -21,6 +23,8 @@ if errorlevel 1 exit /b 1
 call "%~dp0build_scene_zoo.bat"
 if errorlevel 1 exit /b 1
 call "%~dp0build_scene_commentarium.bat"
+if errorlevel 1 exit /b 1
+call "%~dp0build_music_songs.bat"
 if errorlevel 1 exit /b 1
 
 python tools\pack_mmc3.py build\fixed_engine.nes game.nes

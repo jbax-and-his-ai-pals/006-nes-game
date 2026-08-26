@@ -21,34 +21,6 @@ extern volatile unsigned char banked_scene_arg;
 #define SEWER_TILE_FRAME_T 52
 #define BAR_TILE_FLOOR 235
 #define BAR_TILE_WALL 236
-#define TOKEN_TILE 255
-#define has_sewer_key game_state.has_sewer_key
-
-/* Sewer scenery uses a dedicated CHR page, so swap to the common page for
- * the same smooth blue-and-green title-plate message treatment as all UI. */
-static void show_sewer_message(const char *line1, const char *line2)
-{
-    unsigned char pad;
-
-    PPU.mask = 0;
-    mmc3_use_common_chr();
-    /* Palette 3 is unused by sewer scenery, so dialogue cannot recolor it. */
-    dialogue_set_palette(3);
-    show_traffic_death_message(line1, line2);
-
-    do {
-        waitvsync();
-        oam_flush();
-        reset_scroll();
-        pad = read_pad();
-    } while (pad & PAD_A);
-    do {
-        waitvsync();
-        oam_flush();
-        reset_scroll();
-        pad = read_pad();
-    } while (!(pad & PAD_A));
-}
 
 /* A compact first sewer chamber. The shared floor/wall/asphalt/sidewalk and
  * window-edge tiles become damp stone, black water, and a ladder under a new
@@ -59,7 +31,7 @@ static void show_sewer_room(unsigned char room)
         0x0F, 0x01, 0x21, 0x30, 0x0F, 0x00, 0x10, 0x30,
         0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F,
         0x0F, 0x16, 0x0F, 0x0F, 0x0F, 0x0F, 0x27, 0x30,
-        0x0F, 0x16, 0x06, 0x30, 0x0F, 0x0F, 0x0F, 0x30
+        0x0F, 0x16, 0x28, 0x30, 0x0F, 0x0F, 0x0F, 0x30
     };
     unsigned char i;
 
@@ -99,7 +71,8 @@ static void show_sewer_room(unsigned char room)
         set_tile(6, 2, SEWER_TILE_FRAME_TL);
         for (i = 2; i < 30; i += 3) set_tile(7, i, NEON_TILE_WINDOW_V);
         set_tile(8, 2, SEWER_TILE_FRAME_TL);
-        if (!has_sewer_key) set_tile(20, 22, TOKEN_TILE);
+        /* The sewer key used to rest down here; it now hides up in a
+         * Moonlight Park treetop, so the crossing path is just tunnel. */
     }
     for (i = 0; i < 8; ++i) {
         set_attribute_block(0, i, 1);
@@ -150,7 +123,7 @@ unsigned char run_sewer(void)
      * are consumed immediately so unrelated scene entries use their defaults. */
     banked_scene_arg = 0;
     game_state.transfer_y_valid = 0;
-    music_select_song(MUSIC_SONG_SEWER);
+    music_select_song(MUSIC_SONG_BAR);
     show_sewer_room(room);
     for (;;) {
         waitvsync();
@@ -196,13 +169,6 @@ unsigned char run_sewer(void)
         } else if (traffic_state == 0 && (pad & PAD_DOWN)) {
             if (y < (room == 0 ? 216 : 208) &&
                 !sewer_upper_wall_blocks(room, x, y + 1)) ++y;
-        }
-        if (room == 1 && !has_sewer_key && x >= 164 && x <= 196 &&
-            y >= 144 && y <= 176) {
-            has_sewer_key = 1;
-            show_sewer_message("YOU FOUND A SEWER KEY.",
-                               "SMELLS LIKE A DRAIN.");
-            show_sewer_room(room);
         }
         /* The key tunnel's floor ends at y=208, so its road trigger needs
          * to begin just above that limit while the ladder shaft keeps the

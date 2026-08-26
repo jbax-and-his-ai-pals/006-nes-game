@@ -46,9 +46,14 @@
       "source": "build/scene_commentarium_real.bin"
     },
     {
+      "kind": "prg",
+      "banks": [19, 20],
+      "source": "build/music_songs_real.bin"
+    },
+    {
       "kind": "chr",
       "bank": 2,
-      "source": "@common_chr"
+      "source": "build/park_chr.bin"
     },
     {
       "kind": "chr",

@@ -34,14 +34,14 @@ void v2_game_reset(void)
      * one casino_* call the fixed engine still needs -- v2_game_reset()
      * runs before any scene is mapped, so it can't reach into a scene
      * bank the way scene code reaches into the fixed engine. */
-    game_state.casino.credits = 10;
+    game_state.casino.credits = 5;   /* real money now; start with $5 */
     game_state.casino.bet = 1;
     game_state.casino.reel[0] = 0;
     game_state.casino.reel[1] = 0;
     game_state.casino.reel[2] = 0;
     game_state.casino.blackjack_state = CASINO_GAME_READY;
     game_state.casino.poker_state = CASINO_GAME_READY;
-    rng_seed(&game_state.casino.rng, 0x2A);
+    rng_seed(&game_state.casino.rng, random_seed());
 }
 
 void v2_set_route(V2SceneId scene, unsigned char spawn)
