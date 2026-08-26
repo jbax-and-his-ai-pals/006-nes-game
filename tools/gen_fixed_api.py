@@ -15,6 +15,8 @@ SCENE_STUBS = {
     "_run_park",
     "_run_sewer",
     "_run_zoo",
+    "_run_arcade_exterior",
+    "_run_sidestreet_exterior",
 }
 SHARED_ZP = {"c_sp", "sreg", "ptr1", "ptr2", "ptr4", "tmp1", "tmp2"}
 

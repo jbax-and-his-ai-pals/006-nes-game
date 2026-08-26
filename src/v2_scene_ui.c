@@ -75,17 +75,34 @@ void draw_title_plate(unsigned char top_row, unsigned char left_col,
     }
 }
 
-void draw_storefront_sign(void)
+void draw_storefront_sign_at(unsigned char top_row, unsigned char left_col,
+                             unsigned char width)
 {
+    unsigned char right_col = left_col + width - 1;
+    unsigned char fill_width = width - 2;
+
     /* Tile 204 used to be the plate's own dedicated "fill" tile, but it
      * was byte-for-byte identical to FONT_TILE_BASE (both are just solid
      * index 2) -- that slot now holds part of the casino lobby's
      * blackjack table art instead (see neon_avenue.s), so the fill here
      * uses FONT_TILE_BASE directly. Same pixels either way. */
-    set_tile(8, 8, 200); fill_title_rect(8, 9, 14, 1, 201); set_tile(8, 23, 202);
-    set_tile(9, 8, 203); fill_title_rect(9, 9, 14, 1, FONT_TILE_BASE); set_tile(9, 23, 205);
-    set_tile(10, 8, 203); fill_title_rect(10, 9, 14, 1, FONT_TILE_BASE); set_tile(10, 23, 205);
-    set_tile(11, 8, 206); fill_title_rect(11, 9, 14, 1, 207); set_tile(11, 23, 208);
+    set_tile(top_row, left_col, 200);
+    fill_title_rect(top_row, left_col + 1, fill_width, 1, 201);
+    set_tile(top_row, right_col, 202);
+    set_tile(top_row + 1, left_col, 203);
+    fill_title_rect(top_row + 1, left_col + 1, fill_width, 1, FONT_TILE_BASE);
+    set_tile(top_row + 1, right_col, 205);
+    set_tile(top_row + 2, left_col, 203);
+    fill_title_rect(top_row + 2, left_col + 1, fill_width, 1, FONT_TILE_BASE);
+    set_tile(top_row + 2, right_col, 205);
+    set_tile(top_row + 3, left_col, 206);
+    fill_title_rect(top_row + 3, left_col + 1, fill_width, 1, 207);
+    set_tile(top_row + 3, right_col, 208);
+}
+
+void draw_storefront_sign(void)
+{
+    draw_storefront_sign_at(8, 8, 16);
 }
 
 void draw_storefront_window(unsigned char top_row, unsigned char left_col)

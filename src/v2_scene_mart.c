@@ -109,12 +109,14 @@ static void show_mart_exterior(void)
     PPU.mask = 0x1E;
 }
 
-unsigned char run_mart_exterior(unsigned char from_mart)
+unsigned char run_mart_exterior(unsigned char spawn)
 {
-    /* Street travel arrives at the east edge; leaving the store returns
-     * directly beneath its centered front door. */
-    unsigned char x = from_mart ? 128 : 232;
-    unsigned char y = from_mart ? 196 : 200;
+    /* Street travel from the avenue arrives at the east edge; leaving the
+     * store returns directly beneath its centered front door; returning
+     * from the side street arrives at the west edge, mirroring the east
+     * edge's avenue arrival. */
+    unsigned char x = spawn == 1 ? 128 : (spawn == 3 ? 20 : 232);
+    unsigned char y = spawn == 1 ? 196 : 200;
     unsigned char walk_frame = 0;
     unsigned char walk_timer = 0;
     unsigned char facing = PLAYER_FACING_DOWN;
@@ -144,6 +146,7 @@ unsigned char run_mart_exterior(unsigned char from_mart)
             }
             if (pad & PAD_LEFT) {
                 if (x > 12) --x;
+                else return MART_EXIT_SIDESTREET;
             } else if (pad & PAD_RIGHT) {
                 if (x < 244) ++x;
                 else return MART_EXIT_AVENUE;

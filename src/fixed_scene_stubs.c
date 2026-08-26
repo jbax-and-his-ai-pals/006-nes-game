@@ -1,5 +1,7 @@
 /* Link-only scene stand-ins for the fixed-engine physical-layout build.
  * The playable ROM still links real scene modules in its transitional window. */
+#include "v2_scene_arcade.h"
+#include "v2_scene_sidestreet.h"
 #include "v2_scene_avenue.h"
 #include "v2_scene_bar.h"
 #include "v2_scene_casino.h"
@@ -41,6 +43,7 @@ static void keep_scene_api(void)
     mmc3_use_park_chr();
     mmc3_use_casino_cards_chr();
     mmc3_use_sewer_chr();
+    mmc3_use_sidestreet_chr();
     /* The banked casino/commentarium seed their RNGs from the frame counter;
      * keep this fixed-engine entry point alive for them. */
     random_seed();
@@ -65,6 +68,7 @@ static void keep_scene_api(void)
     set_attribute_block(0, 0, 0);
     draw_text(0, 0, "");
     draw_storefront_sign();
+    draw_storefront_sign_at(0, 0, 2);
     draw_storefront_window(0, 0);
     draw_player_sprite(0, 0, 0, 0);
     hide_player_sprite();
@@ -115,3 +119,5 @@ unsigned char run_park(void) { music_scene_bank = 3; mmc3_select_prg_pair(3); re
 unsigned char run_sewer(void) { music_scene_bank = 11; mmc3_select_prg_pair(11); return mmc3_call_mapped_scene(); }
 unsigned char run_zoo(void) { music_scene_bank = 15; mmc3_select_prg_pair(15); return mmc3_call_mapped_scene(); }
 void run_commentarium(void) { music_scene_bank = 17; mmc3_select_prg_pair(17); mmc3_call_mapped_scene(); }
+void run_arcade_exterior(void) { music_scene_bank = 21; mmc3_select_prg_pair(21); mmc3_call_mapped_scene(); }
+unsigned char run_sidestreet_exterior(void) { music_scene_bank = 23; mmc3_select_prg_pair(23); return mmc3_call_mapped_scene(); }

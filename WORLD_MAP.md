@@ -13,13 +13,14 @@ fixed-camera NES scenes connected by explicit routes.
        |                     |                  ^
        +------------- [ Neon Avenue ] ---- closed public gate
                             |       \
-                    [ All-Nite Mart ] [ Jimbles's Bar ] -- [ The Commentarium ]
-                                              |
-                            [ Wrecked 'Em Casino ]
+        [ Galaxy Lanes
+          & Arcade   ]
+               |
+   [ Pawn Shop /     [ All-Nite Mart ] [ Jimbles's Bar ] -- [ The Commentarium ]
+     Laundromat ] --                          |
+                                    [ Wrecked 'Em Casino ]
                                               |
                                   [ Starlight Lodge ]
-                                              |
-                                [ Galaxy Lanes & Arcade ]
                                               |
                               [ Municipal Research Annex ]
 
@@ -36,6 +37,8 @@ fixed-camera NES scenes connected by explicit routes.
 | Wrecked 'Em Casino | Bar backroom door | Slots, blackjack, video poker, roulette, and a return to the Bar. |
 | The Commentarium | Bar side door | A stage performer and a rotating feed of comedic "dumb comments" from the audience. |
 | All-Nite Mart | West Avenue exit | Convenience-store exterior/interior and early item pickup. |
+| Pawn Shop / Laundromat side street | West Mart exit | Two exteriors sharing one screen, both doors reading "not open yet." The gap between them leads north to Galaxy Lanes & Arcade, capped by a collidable horizon line -- not an open placeholder anymore. |
+| Galaxy Lanes & Arcade | North path from the side street | Exterior only for now -- the door reads "not open yet." Interior (darts, shooting gallery, bowling, skeeball, whack-a-mole, claw machine) is still planned, see `ROADMAP.md`. |
 | Moonlight Park | East Avenue exit | Fountain, wandering NPCs, and a service-hatch route toward the Zoo. |
 | Sewer Network | Avenue manhole | First underground route; its dry-tunnel east exit now reaches the Zoo service hatch. |
 | Pocket Zoo service/frontage | Sewer service hatch | Clear the slug infestation, meet Keeper Nibs, receive the Zoo Map, open the public gate, and enter the pond and reptile exhibits. |
@@ -52,10 +55,10 @@ fixed-camera NES scenes connected by explicit routes.
    without overloading Avenue.
 4. **Bar/casino south route -> Starlight Lodge.** Keeps nightlife venues near
    each other and creates a social-access chain.
-5. **Lodge south route -> Galaxy Lanes & Arcade.** Provides a public venue,
-   token economy, and more NPC density.
-6. **Arcade south route -> Municipal Research Annex.** A deliberate late-game
-   destination that can also gain a gated sewer connection.
+5. **Lodge south route -> Municipal Research Annex.** A deliberate late-game
+   destination that can also gain a gated sewer connection. (Galaxy Lanes &
+   Arcade no longer sits on this chain -- it's reached north from the Pawn
+   Shop/Laundromat side street instead; see Current Playable Area above.)
 
 ## Routing Rules
 
@@ -75,5 +78,6 @@ fixed-camera NES scenes connected by explicit routes.
 
 Reserve one PRG pair for a simple exterior or interior, and two or more pairs
 for a destination with multiple rooms or a minigame. The current manifest has
-PRG pairs beginning at 15 available for this expansion map. Give each new
-destination a dedicated CHR bank before adding substantial new art.
+PRG pairs beginning at 25 available for this expansion map (see
+`assets/banks/manifest.json` for the exact assignments already in use). Give
+each new destination a dedicated CHR bank before adding substantial new art.

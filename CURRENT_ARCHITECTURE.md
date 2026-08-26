@@ -29,6 +29,14 @@ The playable flow is:
 9. The Commentarium, reached through Jimbles's Bar's side door: a stage
    performer and a rotating feed of comedic "dumb comments" pulled from a
    data file (see `src/dumb_comments_data.h` and `tools/gen_dumb_comments.py`).
+10. A Pawn Shop/Laundromat side street, reached through the Mart's western
+    edge (the Mart's own west boundary exits here instead of just stopping
+    the player). Two exteriors on one screen, both doors reading "not open
+    yet"; the gap between them leads north to Galaxy Lanes & Arcade, capped
+    by a collidable horizon line rather than an open placeholder.
+11. Galaxy Lanes & Arcade exterior, reached through the side street's north
+    path. Exterior only for now -- the door reads "not open yet"; see
+    `ROADMAP.md`'s Town Blueprint for the planned interior.
 
 ## Cartridge and Bank Baseline
 
@@ -40,10 +48,19 @@ depending on mapper power-on state.
 The live cartridge uses the fixed engine in PRG banks 62-63 and maps each
 location into `$8000-$BFFF` from its manifest-owned PRG pair. The current
 scene pairs (see `assets/banks/manifest.json`) are Park 03-04, Avenue 05-06,
-Bar 07-08, Mart 09-10, Sewer 11-12, Casino 13-14, Zoo 15-16, and Commentarium
-17-18; PRG banks 19-61 remain available for future destinations.
+Bar 07-08, Mart 09-10, Sewer 11-12, Casino 13-14, Zoo 15-16, Commentarium
+17-18, Music 19-20, Arcade 21-22, and the Pawn Shop/Laundromat side street
+23-24; PRG banks 25-61 remain available for future destinations.
 `V2GameState.route` records the active location and spawn; see `ROUTING.md`
 when adding exits, respawns, or destinations.
+
+A new scene doesn't have to hang off Neon Avenue directly -- the side street
+extends the *Mart's* own west boundary instead of adding a new Avenue exit,
+and the arcade extends the *side street's* own north boundary the same way,
+same as the Commentarium extends the Bar's. Each is a one-line dispatcher
+addition in `src/v2_title_main.c` plus a `fixed_scene_stubs.c` wrapper (see
+`run_arcade_exterior`'s comment there) and a `SCENE_STUBS` entry in
+`tools/gen_fixed_api.py`, not new Avenue-level plumbing.
 
 ## Fixed-Core Responsibilities
 

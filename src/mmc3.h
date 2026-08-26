@@ -10,6 +10,10 @@ void mmc3_use_sewer_chr(void);
 /* CHR bank 4: font + box border + suit icons + card back, for the
  * blackjack/poker card screens. See casino_cards.s. */
 void mmc3_use_casino_cards_chr(void);
+/* CHR bank 6: the common bank with one tile patched to a thin transparent-
+ * backed vertical line, for the side street's own north path. See
+ * tools/gen_sidestreet_chr.py. */
+void mmc3_use_sidestreet_chr(void);
 
 /* Fixed-engine only: maps a contiguous 16 KiB scene pair into $8000-$BFFF.
  * The fastcall ABI passes first_bank in A, so no scene-stack data is touched

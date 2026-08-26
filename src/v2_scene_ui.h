@@ -16,6 +16,8 @@ void draw_text(unsigned char row, unsigned char col, const char *text);
 void draw_title_plate(unsigned char top_row, unsigned char left_col,
                       unsigned char width, unsigned char height);
 void draw_storefront_sign(void);
+void draw_storefront_sign_at(unsigned char top_row, unsigned char left_col,
+                             unsigned char width);
 void draw_storefront_window(unsigned char top_row, unsigned char left_col);
 
 #endif

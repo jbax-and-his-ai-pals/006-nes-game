@@ -51,6 +51,16 @@
       "source": "build/music_songs_real.bin"
     },
     {
+      "kind": "prg",
+      "banks": [21, 22],
+      "source": "build/scene_arcade_real.bin"
+    },
+    {
+      "kind": "prg",
+      "banks": [23, 24],
+      "source": "build/scene_sidestreet_real.bin"
+    },
+    {
       "kind": "chr",
       "bank": 2,
       "source": "build/park_chr.bin"
@@ -69,6 +79,11 @@
       "kind": "chr",
       "bank": 5,
       "source": "build/sewer_chr.bin"
+    },
+    {
+      "kind": "chr",
+      "bank": 6,
+      "source": "build/sidestreet_chr.bin"
     }
   ]
 }

@@ -20,6 +20,8 @@
 #include "v2_inventory.h"
 #include "v2_player_actor.h"
 #include "v2_regulars.h"
+#include "v2_scene_arcade.h"
+#include "v2_scene_sidestreet.h"
 #include "v2_scene_casino.h"
 #include "v2_scene_commentarium.h"
 #include "v2_scene_avenue.h"
@@ -369,6 +371,7 @@ void main(void)
         unsigned char sewer_exit;
         unsigned char park_exit;
         unsigned char zoo_exit;
+        unsigned char sidestreet_exit;
 
         avenue_exit = run_neon_avenue(avenue_arrival);
         avenue_arrival = 0;
@@ -404,11 +407,31 @@ void main(void)
         if (avenue_exit == AVENUE_EXIT_MART) {
             v2_set_route(V2_SCENE_MART, 0);
             mart_exit = run_mart_exterior(0);
-            while (mart_exit == MART_EXIT_INTERIOR) {
-                v2_set_route(V2_SCENE_MART, 2);
-                run_mart_interior();
-                v2_set_route(V2_SCENE_MART, 1);
-                mart_exit = run_mart_exterior(1);
+            while (mart_exit == MART_EXIT_INTERIOR || mart_exit == MART_EXIT_SIDESTREET) {
+                if (mart_exit == MART_EXIT_INTERIOR) {
+                    v2_set_route(V2_SCENE_MART, 2);
+                    run_mart_interior();
+                    v2_set_route(V2_SCENE_MART, 1);
+                    mart_exit = run_mart_exterior(1);
+                } else {
+                    v2_set_route(V2_SCENE_SIDESTREET, 0);
+                    sidestreet_exit = run_sidestreet_exterior();
+                    while (sidestreet_exit == SIDESTREET_EXIT_ARCADE) {
+                        /* No traffic in the arcade's own alley -- it only
+                         * ever returns here, so there's nothing else to
+                         * branch on. */
+                        v2_set_route(V2_SCENE_ARCADE, 0);
+                        run_arcade_exterior();
+                        v2_set_route(V2_SCENE_SIDESTREET, 0);
+                        sidestreet_exit = run_sidestreet_exterior();
+                    }
+                    if (sidestreet_exit == SIDESTREET_EXIT_TRAFFIC_DEATH) {
+                        mart_exit = MART_EXIT_TRAFFIC_DEATH;
+                        break;
+                    }
+                    v2_set_route(V2_SCENE_MART, 3);
+                    mart_exit = run_mart_exterior(3);
+                }
             }
             avenue_arrival = mart_exit == MART_EXIT_TRAFFIC_DEATH ? 0 : 2;
             continue;

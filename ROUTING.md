@@ -15,5 +15,6 @@ Current route/spawn conventions:
 | --- | --- |
 | Avenue | 0 fresh, 1 sewer, 2 Mart, 3 Park |
 | Bar | 0 south entrance, 1 casino door |
-| Mart | 0 avenue, 1 store exit, 2 interior |
-| Park, Sewer, Casino | 0 default |
+| Mart | 0 avenue, 1 store exit, 2 interior, 3 side street |
+| Arcade | 0 default (east edge, from the side street's north path) |
+| Park, Sewer, Casino, Side Street | 0 default |

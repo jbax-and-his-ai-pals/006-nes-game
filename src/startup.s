@@ -10,6 +10,7 @@
         .export         __STARTUP__ : absolute = 1
         .export         _mmc3_use_common_chr, _mmc3_use_title_chr, _mmc3_use_park_chr
         .export         _mmc3_use_casino_cards_chr, _mmc3_use_sewer_chr
+        .export         _mmc3_use_sidestreet_chr
         .export         _mmc3_select_prg_pair
         .export         _mmc3_call_mapped_scene
         .export         _banked_scene_arg
@@ -62,6 +63,13 @@ _mmc3_use_casino_cards_chr:
 
 _mmc3_use_sewer_chr:
         lda     #$28
+        jmp     mmc3_map_chr
+
+; CHR bank 6 -- the common bank with one tile patched in (see
+; build_sidestreet_chr.bat and tools/gen_sidestreet_chr.py): a thin
+; transparent-backed vertical line for the side street's own north path.
+_mmc3_use_sidestreet_chr:
+        lda     #$30
         jmp     mmc3_map_chr
 
 ; Map one contiguous 8 KiB CHR page. Registers 0 and 1 select 2 KiB each;
