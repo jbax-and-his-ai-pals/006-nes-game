@@ -61,6 +61,11 @@
       "source": "build/scene_sidestreet_real.bin"
     },
     {
+      "kind": "prg",
+      "banks": [25, 26],
+      "source": "build/scene_gym_real.bin"
+    },
+    {
       "kind": "chr",
       "bank": 2,
       "source": "build/park_chr.bin"
@@ -84,6 +89,21 @@
       "kind": "chr",
       "bank": 6,
       "source": "build/sidestreet_chr.bin"
+    },
+    {
+      "kind": "chr",
+      "bank": 7,
+      "source": "build/arcade_chr.bin"
+    },
+    {
+      "kind": "chr",
+      "bank": 8,
+      "source": "build/gym_chr.bin"
+    },
+    {
+      "kind": "chr",
+      "bank": 9,
+      "source": "build/mart_chr.bin"
     }
   ]
 }

@@ -19,8 +19,8 @@
 #include "v2_input.h"
 #include "v2_inventory.h"
 #include "v2_player_actor.h"
-#include "v2_regulars.h"
 #include "v2_scene_arcade.h"
+#include "v2_scene_gym.h"
 #include "v2_scene_sidestreet.h"
 #include "v2_scene_casino.h"
 #include "v2_scene_commentarium.h"
@@ -355,6 +355,27 @@ void main(void)
     music_select_song(MUSIC_SONG_TITLE);
     wait_for_title_start();
 
+    /* TEMPORARY TEST START -- drops straight into the Gym exterior so it
+     * doesn't need a full Avenue/Mart/side-street/Arcade walk to reach for
+     * every test. Loops the Gym's own interior/exterior only; walking west
+     * out of the Gym falls into the normal dispatcher loop below starting
+     * fresh at the Avenue, the same way the old Arcade-start version's
+     * south exit did. Delete this block (down to the closing brace) to
+     * restore the real boot flow. */
+    {
+        unsigned char gym_exit;
+
+        v2_set_route(V2_SCENE_GYM, 0);
+        gym_exit = run_gym_exterior(0);
+        while (gym_exit == GYM_EXIT_INTERIOR) {
+            v2_set_route(V2_SCENE_GYM, 2);
+            run_gym_interior();
+            v2_set_route(V2_SCENE_GYM, 1);
+            gym_exit = run_gym_exterior(1);
+        }
+    }
+    /* END TEMPORARY TEST START */
+
     /* Neon Avenue, the bar, and the casino hand off to each other by
      * returning -- walking into a doorway exits the current scene's
      * loop, and this dispatcher re-enters whichever one comes next. The
@@ -372,6 +393,8 @@ void main(void)
         unsigned char park_exit;
         unsigned char zoo_exit;
         unsigned char sidestreet_exit;
+        unsigned char arcade_exit;
+        unsigned char gym_exit;
 
         avenue_exit = run_neon_avenue(avenue_arrival);
         avenue_arrival = 0;
@@ -418,10 +441,22 @@ void main(void)
                     sidestreet_exit = run_sidestreet_exterior();
                     while (sidestreet_exit == SIDESTREET_EXIT_ARCADE) {
                         /* No traffic in the arcade's own alley -- it only
-                         * ever returns here, so there's nothing else to
-                         * branch on. */
+                         * ever returns here or to the gym, so there's
+                         * nothing else to branch on. */
                         v2_set_route(V2_SCENE_ARCADE, 0);
-                        run_arcade_exterior();
+                        arcade_exit = run_arcade_exterior();
+                        while (arcade_exit == ARCADE_EXIT_GYM) {
+                            v2_set_route(V2_SCENE_GYM, 0);
+                            gym_exit = run_gym_exterior(0);
+                            while (gym_exit == GYM_EXIT_INTERIOR) {
+                                v2_set_route(V2_SCENE_GYM, 2);
+                                run_gym_interior();
+                                v2_set_route(V2_SCENE_GYM, 1);
+                                gym_exit = run_gym_exterior(1);
+                            }
+                            v2_set_route(V2_SCENE_ARCADE, 0);
+                            arcade_exit = run_arcade_exterior();
+                        }
                         v2_set_route(V2_SCENE_SIDESTREET, 0);
                         sidestreet_exit = run_sidestreet_exterior();
                     }

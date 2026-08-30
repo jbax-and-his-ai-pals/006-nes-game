@@ -15,7 +15,8 @@ typedef enum {
     V2_SCENE_ZOO,
     V2_SCENE_COMMENTARIUM,
     V2_SCENE_ARCADE,
-    V2_SCENE_SIDESTREET
+    V2_SCENE_SIDESTREET,
+    V2_SCENE_GYM
 } V2SceneId;
 
 typedef struct {

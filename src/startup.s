@@ -10,7 +10,9 @@
         .export         __STARTUP__ : absolute = 1
         .export         _mmc3_use_common_chr, _mmc3_use_title_chr, _mmc3_use_park_chr
         .export         _mmc3_use_casino_cards_chr, _mmc3_use_sewer_chr
-        .export         _mmc3_use_sidestreet_chr
+        .export         _mmc3_use_sidestreet_chr, _mmc3_use_arcade_chr
+        .export         _mmc3_use_gym_chr
+        .export         _mmc3_use_mart_chr
         .export         _mmc3_select_prg_pair
         .export         _mmc3_call_mapped_scene
         .export         _banked_scene_arg
@@ -70,6 +72,34 @@ _mmc3_use_sewer_chr:
 ; transparent-backed vertical line for the side street's own north path.
 _mmc3_use_sidestreet_chr:
         lda     #$30
+        jmp     mmc3_map_chr
+
+; CHR bank 7 -- the common bank with the alley road line re-patched at tile 2
+; plus a set of new neon-marquee tiles at indices 60-64 (see
+; build_arcade_chr.bat and tools/gen_arcade_chr.py). Galaxy Lanes & Arcade
+; maps this so its facade can stop being the bar's recolored sign plate.
+_mmc3_use_arcade_chr:
+        lda     #$38
+        jmp     mmc3_map_chr
+
+; CHR bank 8 -- the common bank with a real 2x2 backboard/hoop, a solid
+; court floor, a half-court line/border, courtside equipment, and the
+; exterior's siding/roof cap/ball icon patched in at indices 70-84 (see
+; build_gym_chr.bat and tools/gen_gym_chr.py). The Municipal Gym maps this
+; so its interior reads as an actual court instead of the Mart's recolored
+; shelves and counter, and its exterior breaks from the shared brick
+; facade.
+_mmc3_use_gym_chr:
+        lda     #$40
+        jmp     mmc3_map_chr
+
+; CHR bank 9 -- the common bank with the same corrugated siding and
+; roofline cap as the Gym's own page, patched in at indices 60-61 (see
+; build_mart_chr.bat and tools/gen_mart_chr.py). All-Nite Mart maps this so
+; its exterior shares the Gym's warehouse-style shape and texture instead
+; of the brick facade the Bar/Arcade/Side Street still use.
+_mmc3_use_mart_chr:
+        lda     #$48
         jmp     mmc3_map_chr
 
 ; Map one contiguous 8 KiB CHR page. Registers 0 and 1 select 2 KiB each;

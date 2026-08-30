@@ -37,6 +37,15 @@ The playable flow is:
 11. Galaxy Lanes & Arcade exterior, reached through the side street's north
     path. Exterior only for now -- the door reads "not open yet"; see
     `ROADMAP.md`'s Town Blueprint for the planned interior.
+12. Municipal Gym exterior and interior, reached through the arcade's own
+    east edge -- functional now, but the arcade's own facade art there still
+    reads as plain brick; see `run_arcade_exterior()`'s header comment for
+    the planned road/gap revision. The interior has its own CHR page (a
+    real backboard/rim/net and a wood-court floor, see
+    `tools/gen_gym_chr.py`) rather than reusing the Mart's shelves and
+    counter; it still reuses the bar's music cue. The interior's coach
+    hotspot is a placeholder for the planned live 1-on-1 basketball
+    challenge (see `ROADMAP.md`); it currently just talks.
 
 ## Cartridge and Bank Baseline
 
@@ -49,8 +58,9 @@ The live cartridge uses the fixed engine in PRG banks 62-63 and maps each
 location into `$8000-$BFFF` from its manifest-owned PRG pair. The current
 scene pairs (see `assets/banks/manifest.json`) are Park 03-04, Avenue 05-06,
 Bar 07-08, Mart 09-10, Sewer 11-12, Casino 13-14, Zoo 15-16, Commentarium
-17-18, Music 19-20, Arcade 21-22, and the Pawn Shop/Laundromat side street
-23-24; PRG banks 25-61 remain available for future destinations.
+17-18, Music 19-20, Arcade 21-22, the Pawn Shop/Laundromat side street
+23-24, and the Municipal Gym 25-26; PRG banks 27-61 remain available for
+future destinations.
 `V2GameState.route` records the active location and spawn; see `ROUTING.md`
 when adding exits, respawns, or destinations.
 
@@ -124,8 +134,9 @@ either budget:
 - The NMI queue handles small tile changes and panel rows, but palette/fill
   commands and larger scene transitions still force blanking.
 - The visible 256-tile pattern-table half (the common CHR bank) is full.
-  Casino/card art and the sewer each already have their own dedicated CHR
-  bank (`casino_cards.s` / `sewer_chr.bin`); a new destination needing
+  Casino/card art, the sewer, and the Gym's backboard/court kit each already
+  have their own dedicated CHR bank (`casino_cards.s` / `sewer_chr.bin` /
+  `tools/gen_gym_chr.py`); a new destination needing
   substantial new background art should get one too rather than trying to
   fit into the common bank. When genuinely no CHR slot exists, byte-for-byte
   duplicate tiles across the common bank's source files are sometimes

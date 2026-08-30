@@ -14,6 +14,20 @@ void mmc3_use_casino_cards_chr(void);
  * backed vertical line, for the side street's own north path. See
  * tools/gen_sidestreet_chr.py. */
 void mmc3_use_sidestreet_chr(void);
+/* CHR bank 7: the common bank with the alley road line re-patched plus new
+ * neon-marquee tiles at indices 60-65, for Galaxy Lanes & Arcade. See
+ * tools/gen_arcade_chr.py. */
+void mmc3_use_arcade_chr(void);
+/* CHR bank 8: the common bank with a real 2x2 backboard/hoop, a solid
+ * court floor, a half-court line and perimeter border, courtside
+ * equipment, and the exterior's corrugated siding/roof cap/basketball icon
+ * patched in at indices 70-84, for the Municipal Gym. See
+ * tools/gen_gym_chr.py. */
+void mmc3_use_gym_chr(void);
+/* CHR bank 9: the common bank with the same corrugated siding and roofline
+ * cap as the Gym's own page, patched in at indices 60-61, for All-Nite
+ * Mart's warehouse-style exterior. See tools/gen_mart_chr.py. */
+void mmc3_use_mart_chr(void);
 
 /* Fixed-engine only: maps a contiguous 16 KiB scene pair into $8000-$BFFF.
  * The fastcall ABI passes first_bank in A, so no scene-stack data is touched

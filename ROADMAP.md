@@ -70,7 +70,8 @@ built; what shipped instead, and is the real interaction model going forward:
 | Moonlight Park | Built | Dry fountain, wandering patrons, service-hatch route to the Zoo. |
 | Pocket Zoo | Built | Slug infestation, Keeper Nibs, the Zoo Map, pond/reptile exhibits. |
 | Pawn Shop & Laundromat | In progress | Two exteriors sharing one screen, west of the Mart (`src/v2_scene_sidestreet.c`) -- both doors currently read "not open yet." Interiors still planned; the Pawn Shop's function (junk trinkets, see Economy and Rewards below) is decided, the Laundromat's is still just "deliberately mundane -- the 'why does this room even exist' joke room." The gap between them leads north to Galaxy Lanes & Arcade. |
-| Galaxy Lanes & Arcade | In progress | Exterior built, reached north through the Pawn Shop/Laundromat side street (`src/v2_scene_arcade.c`) -- the door currently reads "not open yet." Interior still planned: darts, shooting gallery, bowling, skeeball, whack-a-mole, and the claw machine, all on the ticket economy (see Economy and Rewards below). |
+| Galaxy Lanes & Arcade | In progress | Exterior built, reached north through the Pawn Shop/Laundromat side street (`src/v2_scene_arcade.c`) -- the door currently reads "not open yet." Interior still planned: darts, shooting gallery, bowling, skeeball, whack-a-mole, and the claw machine, all on the ticket economy (see Economy and Rewards below). Its east edge now leads to the Municipal Gym. |
+| Municipal Gym | In progress | Exterior and interior built (`src/v2_scene_gym.c`), reached east through the Arcade's own boundary -- third proof of the boundary-extension pattern, see `CURRENT_ARCHITECTURE.md`. The coach is a placeholder; the planned mechanic is a timed, live 1-on-1 basketball game against them (real-time movement/AI/collision, not a turn-based meter game), won once for a specific key item. This is a bigger engineering lift than any minigame shipped so far -- see Content Roadmap below. |
 | Casino Back Room | Planned | A second PRG pair reached by a door off the existing lobby -- the casino's own bank is exactly full (see `CURRENT_ARCHITECTURE.md`), so more casino games need fresh budget, not a squeeze. Houses three-card monte/shell game and high-low. |
 | Moonbeam Chapel | Planned | Quiet chapel with an overworked officiant; a ceremonial prop and a social puzzle. |
 | Slug Acres | Planned | Eccentric suburban slug farm; creature-care comedy and a specialty puzzle resource. |
@@ -199,8 +200,9 @@ lost; pull from this list freely when picking what to build next.
 **Minigames:** insult contest (Monkey Island-style comeback duel),
 bartending QTE, a Simon-says pattern game, a small shoot-em-up/maze-chase
 arcade cabinet, ring toss, a test-your-strength high striker, pool/
-billiards, a wheel of fortune, karaoke, a coin pusher, pinball, free-throw
-hoops, arm wrestling.
+billiards, a wheel of fortune, karaoke, a coin pusher, pinball,
+arm wrestling. (Free-throw hoops is no longer parked -- it grew into the
+Municipal Gym's live 1-on-1 basketball challenge, see Town Blueprint above.)
 
 **Locations:** a thrift/antique store, a radio station, a rooftop, a photo booth,
 a fortune-teller/Zoltar machine, a drive-in movie theater, a taxi dispatch
@@ -220,21 +222,28 @@ kazoo for a busking-for-cash beat.
 
 ## Immediate Next Steps
 
-1. Give Galaxy Lanes & Arcade an interior -- it's the more fleshed-out of
-   the two "in progress" rows in the Town Blueprint (its interior scope is
-   already decided), so it's the natural next thing to finish rather than
-   start something new. Pick one game to build first (darts is probably
-   the simplest) and stand up the ticket currency and prize counter
-   alongside it; the economy is easiest to get right when there's exactly
-   one game to test it against.
-2. Give the Pawn Shop an interior next -- the junk-trinket economy it
+1. Build the Municipal Gym's live 1-on-1 basketball engine -- the exterior
+   and interior scaffolding is done (`src/v2_scene_gym.c`); what's left is
+   the real-time minigame itself: player movement, a simple AI opponent,
+   shot timing, possession/scoring, a game clock, and the key-item reward
+   on a win. This is a new category of gameplay for the codebase (the first
+   scene with two simultaneously-acting characters and real per-frame
+   collision, versus every prior minigame's turn-based or meter-timing
+   shape) and will likely want its own dedicated PRG pair plus a CHR bank
+   for the rival sprite, ball, hoop/backboard, and scoreboard digits.
+2. Revise the Arcade's own exterior facade to actually show a passage east
+   to the Gym -- the transition is already functional
+   (`ARCADE_EXIT_GYM` in `src/v2_scene_arcade.c`), but the background art
+   still fills that edge with plain brick.
+3. Give Galaxy Lanes & Arcade an interior -- its interior scope is already
+   decided (darts, shooting gallery, bowling, skeeball, whack-a-mole, claw
+   machine on a ticket economy), so it's a well-defined next destination
+   once the gym's engine work above is further along.
+4. Give the Pawn Shop an interior next -- the junk-trinket economy it
    needs (see Puzzles and progression above) makes it the second-most-
    decided "in progress" row. The Laundromat's own interior can wait until
    its premise firms up beyond "deliberately mundane."
-3. Once the arcade has at least one real game, pick the next thing from
-   the remaining Town Blueprint rows (Casino Back Room, The Diner, or any
-   of the others) -- breadth is still the goal, not a fixed order.
-4. Playtest Zoo and Commentarium from a clean boot; fix anything that only
+5. Playtest Zoo and Commentarium from a clean boot; fix anything that only
    shows up in real play, the same way earlier locations were hardened.
-5. Keep this roadmap in sync as things get built -- move rows from Planned
+6. Keep this roadmap in sync as things get built -- move rows from Planned
    to Built, and pull from Parked Ideas as slots open up.

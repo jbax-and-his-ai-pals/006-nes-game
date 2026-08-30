@@ -14,6 +14,8 @@ call "%~dp0build_scene_bar.bat"
 if errorlevel 1 exit /b 1
 call "%~dp0build_scene_mart.bat"
 if errorlevel 1 exit /b 1
+call "%~dp0build_mart_chr.bat"
+if errorlevel 1 exit /b 1
 call "%~dp0build_sewer_chr.bat"
 if errorlevel 1 exit /b 1
 call "%~dp0build_scene_sewer.bat"
@@ -28,9 +30,15 @@ call "%~dp0build_music_songs.bat"
 if errorlevel 1 exit /b 1
 call "%~dp0build_scene_arcade.bat"
 if errorlevel 1 exit /b 1
+call "%~dp0build_arcade_chr.bat"
+if errorlevel 1 exit /b 1
 call "%~dp0build_scene_sidestreet.bat"
 if errorlevel 1 exit /b 1
 call "%~dp0build_sidestreet_chr.bat"
+if errorlevel 1 exit /b 1
+call "%~dp0build_scene_gym.bat"
+if errorlevel 1 exit /b 1
+call "%~dp0build_gym_chr.bat"
 if errorlevel 1 exit /b 1
 
 python tools\pack_mmc3.py build\fixed_engine.nes game.nes

@@ -16,12 +16,29 @@
 #define MART_TILE_REGISTER 58
 #define NEON_TILE_ASPHALT 192
 #define NEON_TILE_SIDEWALK 193
-#define NEON_TILE_BRICK 194
-#define NEON_TILE_AWNING 195
 #define NEON_TILE_DOOR_L 197
 #define NEON_TILE_DOOR_C 198
 #define NEON_TILE_DOOR_R 199
-#define NEON_TILE_WINDOW_FILL 211
+/* This scene's own CHR page (see tools/gen_mart_chr.py): the common bank
+ * with a solid wall panel, a seamed variant of it used sparingly as accent
+ * lines (not tiled into a grid -- that read as busy stripes rather than
+ * construction), the same roofline cap as the Municipal Gym's own page (see
+ * v2_scene_gym.c), and a genuinely solid glass tile with a diagonal shine,
+ * patched in at indices 60-64 -- lower indices than the Gym's own (70+)
+ * since the Mart has no wandering NPCs competing for
+ * BAR_PATRON_BACK_TOP/BOTTOM (59-60). The glass has its own tile rather
+ * than reusing the common bank's NEON_TILE_WINDOW_FILL: that tile has a
+ * mullion hint baked in for use in pairs, and repeating it across a bigger
+ * window just repeated that hint into an unwanted grid. */
+#define MART_SIDING 60
+#define MART_ROOF_CAP 61
+#define MART_GLASS 62
+#define MART_SIDING_SEAM 63
+#define MART_SIDING_SEAM_H 64
+#define MART_SIDING_SEAM_L 65
+#define MART_DOOR_LINTEL 66
+#define TILE_BORDER_H 52
+#define TILE_BORDER_V 53
 #define PLAYER_TILE_BASE 212
 #define BAR_TILE_FLOOR 235
 #define BAR_TILE_WALL 236
@@ -35,72 +52,168 @@
 static void show_mart_message(const char *line1, const char *line2,
                               const char *line3);
 
-/* All-Nite Mart sits one screen west of Jimbles's Bar. It shares the avenue
- * tile set, but uses the same full-height storefront treatment as the bar so
- * the two screens feel like parts of one intentional street. */
+/* A plain bordered window, unlike draw_storefront_window()'s cross-mullion
+ * grid every other building's storefront uses -- a flat rectangle of glass
+ * behind a simple frame reads glassier than a many-paned grid does. */
+static void draw_mart_window(unsigned char top_row, unsigned char left_col,
+                             unsigned char width, unsigned char height)
+{
+    unsigned char row, col;
+
+    for (col = left_col; col < (unsigned char)(left_col + width); ++col) {
+        set_tile(top_row, col, TILE_BORDER_H);
+        set_tile((unsigned char)(top_row + height - 1), col, TILE_BORDER_H);
+    }
+    for (row = (unsigned char)(top_row + 1); row < (unsigned char)(top_row + height - 1); ++row) {
+        set_tile(row, left_col, TILE_BORDER_V);
+        fill_title_rect(row, (unsigned char)(left_col + 1), (unsigned char)(width - 2), 1,
+                        MART_GLASS);
+        set_tile(row, (unsigned char)(left_col + width - 1), TILE_BORDER_V);
+    }
+}
+
+/* All-Nite Mart sits one screen west of Jimbles's Bar. Every other building
+ * in town used to share one brick-storefront facade, just recolored; this
+ * one now shares the Municipal Gym's warehouse-style shape instead (see
+ * v2_scene_gym.c's own show_gym_exterior(), which this mirrors closely) --
+ * a parapet roofline cap and a shorter building under more open sky. The
+ * wall itself is a genuinely different color from every other building
+ * (teal, not a shade of the Gym's steel-blue), textured with just two
+ * accent lines -- a vertical seam at each edge of the building and a
+ * horizontal one along its base -- rather than a tiled grid, which read as
+ * busy pinstripes instead of construction detail. The windows are plain
+ * bordered rectangles (see draw_mart_window() above) instead of a
+ * cross-mullion grid. The name now sits on a proper bordered sign plate
+ * (see draw_storefront_sign_at() in v2_scene_ui.c), the same one every
+ * brick storefront uses including Jimbles's Bar, instead of hand-painted
+ * text loose on the trim band. */
 static void show_mart_exterior(void)
 {
     static const unsigned char mart_palette[32] = {
         0x0F, 0x01, 0x28, 0x0F,
-        /* The shared running-bond tile becomes gray cinder block here;
-         * its awning uses palette entries 2 and 3 as a steel/white stripe. */
-        0x0F, 0x00, 0x10, 0x30,
-        /* The plate art maps index 1 to trim and index 2 to its black
-         * center, so this makes the Mart's sign a green neon plate. */
-        0x0F, 0x2A, 0x0F, 0x30,
-        /* Window blocks also contain a little surrounding wall. Keep
-         * index 1 the same gray as the cinder block, leaving only the
-         * glass itself blue instead of creating blue masonry artifacts. */
-        0x0F, 0x00, 0x21, 0x30,
+        /* Teal siding -- also the window glass's palette (index 2's blue
+         * reads as glass against the wall tone, the same trick the Gym's
+         * own windows use). */
+        0x0F, 0x1B, 0x21, 0x30,
+        /* A green trim band near the roofline -- the Mart's own
+         * established accent color (its old sign plate was green too),
+         * carried onto the new shape instead of the Gym's gold. */
+        0x0F, 0x1A, 0x00, 0x2A,
+        /* The sign plate's own palette -- a black field with a white
+         * border, the same two-color scheme Jimbles's Bar's own sign uses
+         * (see neon_avenue.s's sign-plate tile comments), just white
+         * instead of that one's pink. Kept separate from pal2 above
+         * instead of reusing it: pal2's index 1 is also the plain wall
+         * tiles flanking the sign, which need to stay green, not turn
+         * white along with the border. */
+        0x0F, 0x30, 0x0F, 0x30,
         0x0F, 0x16, 0x0F, 0x0F, 0x0F, 0x0F, 0x27, 0x30,
         0x0F, 0x16, 0x28, 0x30, 0x0F, 0x0F, 0x0F, 0x30
     };
     unsigned char i;
 
     PPU.mask = 0;
-    mmc3_use_common_chr();
+    mmc3_use_mart_chr();
     PPU.vram.address = 0x3F;
     PPU.vram.address = 0;
     for (i = 0; i < 32; ++i) PPU.vram.data = mart_palette[i];
-    for (i = 0; i < 3; ++i) fill_row(i, CHR_TILE_PATH);
-    for (i = 3; i < 24; ++i) {
+    /* Open sky above a shorter building, instead of the tall facade every
+     * brick storefront still fills almost the whole screen with. The cap
+     * shares row 8 with the sign plate below (its top border punches a
+     * gap in the middle of it) -- giving the cap its own row one tile
+     * higher looked like an improvement on paper, but that row's other
+     * three tile-rows (4-6) are still blank sky sharing the SAME attribute
+     * block as the cap, so the whole block got tinted the cap's green and
+     * the sky itself turned into a huge green slab. Row 8's block-mates
+     * (9-11) are already meant to be green trim, so it's the only place
+     * the cap can sit without that bleed. */
+    for (i = 0; i < 8; ++i) fill_row(i, CHR_TILE_PATH);
+    fill_title_rect(8, 0, 4, 1, CHR_TILE_PATH);
+    fill_title_rect(8, 4, 24, 1, MART_ROOF_CAP);
+    fill_title_rect(8, 28, 4, 1, CHR_TILE_PATH);
+    /* Plain wall, with just two accent lines: a vertical seam at each edge
+     * of the building (col 4 and col 27, one column inside each window's
+     * own frame -- see draw_mart_window() below) and a horizontal seam
+     * along the base (the last wall row before the sidewalk), reading as a
+     * foundation line. Two lines, not a tiled grid -- the grid read as
+     * busy pinstripes rather than construction detail. The left edge uses
+     * the mirrored seam tile (MART_SIDING_SEAM_L) so both flanks read the
+     * same way: a sliver of green between the line and the open sky
+     * outside it, with the line itself hugging the window frame inside it.
+     * The vertical lines only start at row 12, not the trim band above it
+     * (9-11) -- their bright pixel is index 3, white under the wall's own
+     * palette 1 but green under the trim's palette 2 (index 3 there is the
+     * banner text's own ink color), so running them up into the trim band
+     * turned them green instead of white. */
+    for (i = 9; i < 24; ++i) {
+        unsigned char is_base_row = i == 23;
+
         fill_title_rect(i, 0, 4, 1, CHR_TILE_PATH);
-        fill_title_rect(i, 4, 24, 1, NEON_TILE_BRICK);
+        if (is_base_row) {
+            fill_title_rect(i, 4, 24, 1, MART_SIDING_SEAM_H);
+        } else {
+            fill_title_rect(i, 4, 24, 1, MART_SIDING);
+            if (i >= 12) {
+                set_tile(i, 4, MART_SIDING_SEAM_L);
+                set_tile(i, 27, MART_SIDING_SEAM);
+            }
+        }
         fill_title_rect(i, 28, 4, 1, CHR_TILE_PATH);
     }
     for (i = 24; i < 26; ++i) fill_row(i, NEON_TILE_SIDEWALK);
     for (i = 26; i < 30; ++i) fill_row(i, NEON_TILE_ASPHALT);
-    fill_title_rect(3, 4, 24, 1, NEON_TILE_AWNING);
-    /* Use the avenue's rounded neon storefront sign rather than the broad
-     * title-menu plate so the Mart and bar share a consistent sign language. */
-    draw_storefront_sign();
+    /* A proper bordered sign plate, the same shape and scale as Jimbles's
+     * Bar's own (see draw_storefront_sign() in v2_scene_avenue.c) -- 4 rows
+     * tall, 16 wide, centered over the door. It sits in the roof-cap row
+     * (row 8) the same way the Bar's plate sits in its own row-block 2,
+     * overwriting the middle of the cap with the plate's top border while
+     * the cap's own tiles remain visible at each flank. */
+    draw_storefront_sign_at(8, 8, 16);
     draw_text(9, 9, "ALL-NITE MART");
-    draw_storefront_window(13, 8);
-    draw_storefront_window(13, 20);
-    for (i = 17; i < 24; ++i) {
+    /* Two big windows flanking the door, doubled in height from the last
+     * pass (12-19, 8 tall) -- the door shrinks to 4 rows (20-23) to make
+     * room, still starting right where the windows end. */
+    draw_mart_window(12, 5, 8, 8);
+    draw_mart_window(12, 19, 8, 8);
+    /* A lintel bar over the door, level with the windows' own bottom
+     * border (row 19) -- without it the door read as a hole punched
+     * straight into the wall with nothing marking its top. A dedicated
+     * solid-white tile, not TILE_BORDER_H (the window frame's border) --
+     * that one's two-toned and read as an odd blue-and-green stripe when
+     * standing alone instead of against glass. */
+    fill_title_rect(19, 14, 3, 1, MART_DOOR_LINTEL);
+    for (i = 20; i < 24; ++i) {
         set_tile(i, 14, NEON_TILE_DOOR_L);
         set_tile(i, 15, NEON_TILE_DOOR_C);
         set_tile(i, 16, NEON_TILE_DOOR_R);
     }
-    set_tile(20, 16, DOORKNOB_TILE);
+    /* Vertically centered on the 4-row door (rows 20-23), the same fix the
+     * Gym's own doorknob needed. */
+    set_tile(21, 16, DOORKNOB_TILE);
 
     for (i = 0; i < 8; ++i) set_attribute_block(0, i, 0);
-    for (i = 1; i <= 5; ++i) {
-        set_attribute_block(i, 0, 0);
-        set_attribute_block(i, 7, 0);
-    }
-    for (i = 1; i < 7; ++i) {
-        set_attribute_block(1, i, 1);
-        set_attribute_block(2, i, 1);
-        set_attribute_block(3, i, 1);
-        set_attribute_block(4, i, 1);
-        set_attribute_block(5, i, 1);
-    }
-    for (i = 2; i < 6; ++i) set_attribute_block(2, i, 2);
-    set_attribute_block(3, 2, 3);
-    set_attribute_block(3, 5, 3);
-    set_attribute_block(4, 2, 3);
-    set_attribute_block(4, 5, 3);
+    for (i = 0; i < 8; ++i) set_attribute_block(1, i, 0);
+    /* Row 2 (tile rows 8-11): the cap's own flanks (column-blocks 1 and 6)
+     * get palette 2's green/shadow, but the sign's exact span
+     * (column-blocks 2-5, matching its 16-tile width starting at col 8)
+     * gets its own dedicated palette 3 instead -- a black plate with a
+     * white border, not sharing pal2's green. Rows 3-5 (12-23) are the
+     * plain siding body, windows included -- their glass shares palette 1
+     * with the wall for the same masonry-artifact reason as before. */
+    set_attribute_block(2, 0, 0);
+    set_attribute_block(2, 1, 2);
+    for (i = 2; i < 6; ++i) set_attribute_block(2, i, 3);
+    set_attribute_block(2, 6, 2);
+    set_attribute_block(2, 7, 0);
+    set_attribute_block(3, 0, 0);
+    for (i = 1; i < 7; ++i) set_attribute_block(3, i, 1);
+    set_attribute_block(3, 7, 0);
+    set_attribute_block(4, 0, 0);
+    for (i = 1; i < 7; ++i) set_attribute_block(4, i, 1);
+    set_attribute_block(4, 7, 0);
+    set_attribute_block(5, 0, 0);
+    for (i = 1; i < 7; ++i) set_attribute_block(5, i, 1);
+    set_attribute_block(5, 7, 0);
     for (i = 0; i < 8; ++i) set_attribute_block(6, i, 0);
     for (i = 0; i < 8; ++i) set_attribute_block(7, i, 0);
     clear_sprites();
@@ -223,7 +336,7 @@ static void show_mart_interior(void)
     unsigned char i;
 
     PPU.mask = 0;
-    mmc3_use_common_chr();
+    mmc3_use_mart_chr();
     PPU.vram.address = 0x3F;
     PPU.vram.address = 0;
     for (i = 0; i < 32; ++i) PPU.vram.data = mart_interior_palette[i];

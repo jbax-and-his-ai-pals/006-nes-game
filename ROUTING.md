@@ -17,4 +17,5 @@ Current route/spawn conventions:
 | Bar | 0 south entrance, 1 casino door |
 | Mart | 0 avenue, 1 store exit, 2 interior, 3 side street |
 | Arcade | 0 default (east edge, from the side street's north path) |
+| Gym | 0 arcade (west edge), 1 leaving the gym (door), 2 interior |
 | Park, Sewer, Casino, Side Street | 0 default |

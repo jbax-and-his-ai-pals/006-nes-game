@@ -1,6 +1,7 @@
 /* Link-only scene stand-ins for the fixed-engine physical-layout build.
  * The playable ROM still links real scene modules in its transitional window. */
 #include "v2_scene_arcade.h"
+#include "v2_scene_gym.h"
 #include "v2_scene_sidestreet.h"
 #include "v2_scene_avenue.h"
 #include "v2_scene_bar.h"
@@ -17,11 +18,11 @@ extern volatile unsigned char banked_scene_arg;
 #include "v2_dialogue.h"
 #include "v2_inventory.h"
 #include "v2_player_actor.h"
-#include "v2_regulars.h"
 #include "v2_runtime.h"
 #include "v2_scene_ui.h"
 #include "v2_traffic.h"
 #include "v2_vram_queue.h"
+#include "rng.h"
 
 /* Recorded by each scene-entry stub: the first PRG bank it maps. music_select_song
  * briefly maps the music bank to cache a song, then restores this bank. */
@@ -44,9 +45,22 @@ static void keep_scene_api(void)
     mmc3_use_casino_cards_chr();
     mmc3_use_sewer_chr();
     mmc3_use_sidestreet_chr();
+    mmc3_use_arcade_chr();
+    mmc3_use_gym_chr();
+    mmc3_use_mart_chr();
     /* The banked casino/commentarium seed their RNGs from the frame counter;
      * keep this fixed-engine entry point alive for them. */
     random_seed();
+    /* Nothing left in the fixed engine itself calls rng_seed/rng_next now
+     * that each scene's wandering-NPC logic keeps its own RngState locally
+     * (see v2_scene_park.c and friends) instead of sharing v2_regulars.c --
+     * without a keep-alive here the linker drops them as unreferenced and
+     * every one of those scenes fails to link. */
+    {
+        RngState scratch;
+        rng_seed(&scratch, 1);
+        (void)rng_next(&scratch);
+    }
     music_sfx_hurt();
     /* The bar scene's chugging challenge uses the pickup blip per gulp.
      * Keep it alive like the other scene-facing effects. */
@@ -72,13 +86,9 @@ static void keep_scene_api(void)
     draw_storefront_window(0, 0);
     draw_player_sprite(0, 0, 0, 0);
     hide_player_sprite();
-    reset_park_regulars();
-    update_park_regulars();
-    (void)park_regular_is_near(0, 0, 0);
-    reset_piss_corner_regulars();
-    update_piss_corner_regulars();
-    draw_regulars();
-    draw_bar_patron();
+    /* Park's, the Bar's, and the Gym's wandering-NPC logic each moved into
+     * their own scene file (was v2_regulars.c) -- no keep-alive calls
+     * belong here anymore, matching the casino note just below. */
     draw_taxi_sprite(0, 0);
     hide_taxi_sprite();
     draw_traffic_particles(0, 0);
@@ -119,5 +129,7 @@ unsigned char run_park(void) { music_scene_bank = 3; mmc3_select_prg_pair(3); re
 unsigned char run_sewer(void) { music_scene_bank = 11; mmc3_select_prg_pair(11); return mmc3_call_mapped_scene(); }
 unsigned char run_zoo(void) { music_scene_bank = 15; mmc3_select_prg_pair(15); return mmc3_call_mapped_scene(); }
 void run_commentarium(void) { music_scene_bank = 17; mmc3_select_prg_pair(17); mmc3_call_mapped_scene(); }
-void run_arcade_exterior(void) { music_scene_bank = 21; mmc3_select_prg_pair(21); mmc3_call_mapped_scene(); }
+unsigned char run_arcade_exterior(void) { music_scene_bank = 21; mmc3_select_prg_pair(21); return mmc3_call_mapped_scene(); }
 unsigned char run_sidestreet_exterior(void) { music_scene_bank = 23; mmc3_select_prg_pair(23); return mmc3_call_mapped_scene(); }
+unsigned char run_gym_exterior(unsigned char spawn) { banked_scene_arg = spawn; music_scene_bank = 25; mmc3_select_prg_pair(25); return mmc3_call_mapped_scene(); }
+void run_gym_interior(void) { banked_scene_arg = 2; music_scene_bank = 25; mmc3_select_prg_pair(25); mmc3_call_mapped_scene(); }

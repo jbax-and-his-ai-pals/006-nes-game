@@ -14,7 +14,7 @@ fixed-camera NES scenes connected by explicit routes.
        +------------- [ Neon Avenue ] ---- closed public gate
                             |       \
         [ Galaxy Lanes
-          & Arcade   ]
+          & Arcade   ] -- [ Municipal Gym ]
                |
    [ Pawn Shop /     [ All-Nite Mart ] [ Jimbles's Bar ] -- [ The Commentarium ]
      Laundromat ] --                          |
@@ -38,7 +38,8 @@ fixed-camera NES scenes connected by explicit routes.
 | The Commentarium | Bar side door | A stage performer and a rotating feed of comedic "dumb comments" from the audience. |
 | All-Nite Mart | West Avenue exit | Convenience-store exterior/interior and early item pickup. |
 | Pawn Shop / Laundromat side street | West Mart exit | Two exteriors sharing one screen, both doors reading "not open yet." The gap between them leads north to Galaxy Lanes & Arcade, capped by a collidable horizon line -- not an open placeholder anymore. |
-| Galaxy Lanes & Arcade | North path from the side street | Exterior only for now -- the door reads "not open yet." Interior (darts, shooting gallery, bowling, skeeball, whack-a-mole, claw machine) is still planned, see `ROADMAP.md`. |
+| Galaxy Lanes & Arcade | North path from the side street | Exterior only for now -- the door reads "not open yet." Interior (darts, shooting gallery, bowling, skeeball, whack-a-mole, claw machine) is still planned, see `ROADMAP.md`. Its east edge now leads to the Municipal Gym, though the facade art there hasn't caught up yet. |
+| Municipal Gym | East edge of Galaxy Lanes & Arcade | Exterior and interior built, with the interior's own CHR page (real backboard/rim/net, wood-court floor) and the bar's music cue reused for now. The coach is a placeholder for the planned live 1-on-1 basketball challenge, see `ROADMAP.md`. |
 | Moonlight Park | East Avenue exit | Fountain, wandering NPCs, and a service-hatch route toward the Zoo. |
 | Sewer Network | Avenue manhole | First underground route; its dry-tunnel east exit now reaches the Zoo service hatch. |
 | Pocket Zoo service/frontage | Sewer service hatch | Clear the slug infestation, meet Keeper Nibs, receive the Zoo Map, open the public gate, and enter the pond and reptile exhibits. |

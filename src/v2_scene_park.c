@@ -2,11 +2,11 @@
 
 #include "mmc3.h"
 #include "music.h"
+#include "rng.h"
 #include "v2_dialogue.h"
 #include "v2_game_state.h"
 #include "v2_inventory.h"
 #include "v2_player_actor.h"
-#include "v2_regulars.h"
 #include "v2_runtime.h"
 #include "v2_scene_park.h"
 #include "v2_scene_ui.h"
@@ -24,6 +24,10 @@
 #define BAR_TILE_STOOL 243
 #define FONT_TILE_BASE 8
 #define TOKEN_TILE 255
+#define PLAYER_TILE_BASE 212
+#define BAR_PATRON_BACK_TOP 59
+#define BAR_PATRON_BACK_BOTTOM 60
+#define REGULAR_FACE_TILE 2
 #define has_sewer_key game_state.has_sewer_key
 /* Moonlight Park is intentionally a quiet counterpoint to the storefronts:
  * a green, open tableau with a footpath, fountain, bench, and oversized
@@ -182,6 +186,80 @@ static unsigned char park_player_is_in_top_foliage(unsigned char x, unsigned cha
            (x >= 208 && x <= 240 && y >= 136 && y <= 151);
 }
 
+/* Two wandering regulars. This used to share a system in v2_regulars.c with
+ * the Bar's and the Gym's own wandering NPCs, living in the fixed engine so
+ * all three scenes could call it -- that shared copy kept costing fixed-
+ * engine budget every time any of the three grew, so each scene now keeps
+ * its own copy instead. Position/timer state has to be local to run_park()
+ * rather than file-scope statics: a scene's own PRG pair (see
+ * cfg/nes_mmc3_scene.cfg) has no BSS/RAM region of its own, only
+ * CODE/RODATA, so there's nowhere for a persistent scene-level variable to
+ * live. */
+static void update_regular(unsigned char *x, unsigned char *y, unsigned char *timer,
+                           unsigned char *steps, unsigned char *direction,
+                           unsigned char *facing_up, RngState *rng, unsigned char min_x,
+                           unsigned char max_x, unsigned char min_y, unsigned char max_y)
+{
+    unsigned char roll;
+    if (*timer) --*timer;
+    else if (*steps) {
+        switch (*direction) {
+            case 0: if (*x < max_x) ++*x; else --*x; *facing_up = 0; break;
+            case 1: if (*x > min_x) --*x; else ++*x; *facing_up = 0; break;
+            case 2: if (*y < max_y) ++*y; else --*y; *facing_up = 0; break;
+            default: if (*y > min_y) { --*y; *facing_up = 1; } else { ++*y; *facing_up = 0; } break;
+        }
+        --*steps;
+        *timer = (unsigned char)(2 + (rng_next(rng) & 3));
+    } else {
+        roll = rng_next(rng);
+        *direction = roll & 3;
+        *steps = (unsigned char)(2 + ((roll >> 2) & 3));
+        *timer = (unsigned char)(45 + (rng_next(rng) & 0x7F));
+    }
+}
+
+/* direction 0/1 (right/left) draws the player's own narrow 2-tile
+ * side-profile art (PLAYER_TILE_BASE+6/+7, see v2_player_actor.c) mirrored
+ * via the OAM flip bit, instead of just flipping the wide front-facing
+ * pose left-right -- a true side view instead of a subtle, easy-to-miss
+ * mirror of a pose that doesn't obviously face either direction to begin
+ * with. direction 2 (down) keeps the wide 4-tile front view and its face
+ * overlay; the side profile has no room for one. */
+static void draw_regular(unsigned char slot, unsigned char face_slot, unsigned char x,
+                         unsigned char y, unsigned char facing_up, unsigned char direction)
+{
+    if (facing_up) {
+        set_oam_sprite(slot, x, y, BAR_PATRON_BACK_TOP, 1);
+        set_oam_sprite(slot + 1, (unsigned char)(x + 8), y, BAR_PATRON_BACK_TOP, 0x41);
+        set_oam_sprite(slot + 2, x, (unsigned char)(y + 8), BAR_PATRON_BACK_BOTTOM, 1);
+        set_oam_sprite(slot + 3, (unsigned char)(x + 8), (unsigned char)(y + 8), BAR_PATRON_BACK_BOTTOM, 0x41);
+        hide_oam_sprite(face_slot); hide_oam_sprite(face_slot + 1);
+    } else if (direction == 0 || direction == 1) {
+        unsigned char side_attr = direction == 1 ? 0x41 : 1;
+
+        set_oam_sprite(slot, (unsigned char)(x + 4), y, PLAYER_TILE_BASE + 6, side_attr);
+        hide_oam_sprite(slot + 1);
+        set_oam_sprite(slot + 2, (unsigned char)(x + 4), (unsigned char)(y + 8), PLAYER_TILE_BASE + 7, side_attr);
+        hide_oam_sprite(slot + 3);
+        hide_oam_sprite(face_slot); hide_oam_sprite(face_slot + 1);
+    } else {
+        set_oam_sprite(slot, x, y, PLAYER_TILE_BASE, 1);
+        set_oam_sprite(slot + 1, (unsigned char)(x + 8), y, PLAYER_TILE_BASE + 1, 1);
+        set_oam_sprite(slot + 2, x, (unsigned char)(y + 8), PLAYER_TILE_BASE + 2, 1);
+        set_oam_sprite(slot + 3, (unsigned char)(x + 8), (unsigned char)(y + 8), PLAYER_TILE_BASE + 3, 1);
+        set_oam_sprite(face_slot, x, y, REGULAR_FACE_TILE, 3);
+        set_oam_sprite(face_slot + 1, (unsigned char)(x + 8), y, REGULAR_FACE_TILE, 0x43);
+    }
+}
+
+static unsigned char regular_is_near(unsigned char regular_x, unsigned char regular_y,
+                                     unsigned char x, unsigned char y)
+{
+    return x >= regular_x - 12 && x <= regular_x + 20 &&
+           y >= regular_y - 12 && y <= regular_y + 24;
+}
+
 static void show_park_message(const char *line1, const char *line2,
                               const char *line3)
 {
@@ -206,10 +284,18 @@ unsigned char run_park(void)
     unsigned char taxi_moving_left = 0;
     unsigned char death_released = 0;
     int taxi_x = 0;
+    unsigned char one_x = 72, one_y = 152;
+    unsigned char two_x = 184, two_y = 168;
+    unsigned char one_timer = 35, two_timer = 96;
+    unsigned char one_steps = 0, two_steps = 0;
+    unsigned char one_direction = 0, two_direction = 0;
+    unsigned char one_facing_up = 0, two_facing_up = 0;
+    RngState regular_rng;
+
     music_select_song(MUSIC_SONG_BAR);
     show_park();
     /* Keep a distinct ambient stream. Music remains NMI-clocked. */
-    reset_park_regulars();
+    rng_seed(&regular_rng, random_seed());
     for (;;) {
         waitvsync();
         reset_scroll();
@@ -289,14 +375,14 @@ unsigned char run_park(void)
          * line, and only otherwise does the fountain's dry note play -- never
          * two messages stacked. */
         if (pad & PAD_A) {
-            if (park_regular_is_near(0, x, y)) {
+            if (regular_is_near(one_x, one_y, x, y)) {
                 if (!park_regular_one_prompted) {
                     park_regular_one_prompted = 1;
                     show_park_message("I CAME FOR THE", "FOUNTAIN, GIGGITY,",
                                       "BUT IT'S DRY.");
                     show_park();
                 }
-            } else if (park_regular_is_near(1, x, y)) {
+            } else if (regular_is_near(two_x, two_y, x, y)) {
                 if (!park_regular_two_prompted) {
                     park_regular_two_prompted = 1;
                     show_park_message("THE TREES KNOW", "TOO MUCH.", 0);
@@ -323,8 +409,12 @@ unsigned char run_park(void)
         /* Two separately seeded, slow patrons make the park feel occupied
          * and guarantee the idle scene remains on the same frame cadence as
          * movement-heavy scenes without coupling any behavior to input. */
-        update_park_regulars();
-        draw_regulars();
+        update_regular(&one_x, &one_y, &one_timer, &one_steps, &one_direction,
+                       &one_facing_up, &regular_rng, 56, 104, 136, 184);
+        update_regular(&two_x, &two_y, &two_timer, &two_steps, &two_direction,
+                       &two_facing_up, &regular_rng, 160, 208, 136, 184);
+        draw_regular(30, 20, one_x, one_y, one_facing_up, one_direction);
+        draw_regular(34, 22, two_x, two_y, two_facing_up, two_direction);
         draw_park_trunks();
         draw_player_sprite(x, y, walk_frame, facing);
         /* The canopy is foreground scenery only in its upper halves; the

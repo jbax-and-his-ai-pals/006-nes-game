@@ -37,21 +37,22 @@ static void show_sidestreet_exterior(void)
 {
     static const unsigned char sidestreet_palette[32] = {
         0x0F, 0x01, 0x28, 0x0F,
-        /* Pawn Shop: a worn brown/tan brick instead of the Mart's cinder
-         * gray or the Arcade's violet. */
+        /* Both Pawn Shop and Laundromat share this same worn brown/tan
+         * brick for now (was two distinct colors, blue for the
+         * Laundromat) -- freeing pal2 below to be a genuinely unused
+         * background color again, since no attribute block in this scene
+         * still points at it, restoring the original "dialogue can safely
+         * hijack it" property every temporary two-brick-color scheme here
+         * kept breaking (see show_sidestreet_message()'s own comment). */
         0x0F, 0x07, 0x17, 0x30,
-        /* Laundromat: a clean blue instead -- deliberately its own
-         * building-only color, not shared with anything else on this
-         * street, so the two shops read as distinct at a glance. */
-        0x0F, 0x11, 0x21, 0x30,
-        /* Palette 3 is deliberately left unused by any attribute block in
-         * this scene -- reserved entirely for dialogue_set_palette(3), so
-         * both the traffic-death message and the "not open yet" door
-         * messages can use it with zero risk of recoloring anything still
-         * visible, unlike the Arcade's own pal3, which had to share space
-         * with the window art already living there (see run_arcade_
-         * exterior()'s comment on that tradeoff). */
+        /* Unused by any attribute block now -- reserved entirely for
+         * dialogue_set_palette(2), the same "zero risk" role pal3 used to
+         * play here before the signs claimed it. */
         0x0F, 0x00, 0x10, 0x20,
+        /* Both signs' own black field/white border (see the attribute
+         * block comment below -- matching Jimbles's Bar's own sign look,
+         * and Mart's, see v2_scene_mart.c). */
+        0x0F, 0x30, 0x0F, 0x30,
         /* Shared player/taxi/crash sprite palettes -- identical to every
          * other exterior, not scene-specific. */
         0x0F, 0x16, 0x0F, 0x0F, 0x0F, 0x0F, 0x27, 0x30,
@@ -112,6 +113,13 @@ static void show_sidestreet_exterior(void)
     draw_storefront_sign_at(8, 20, 12);
     draw_text(9, 1, "PAWN SHOP");
     draw_text(9, 21, "LAUNDROMAT");
+    /* One 4-tile window per shop, left of the Pawn Shop's door and right of
+     * the Laundromat's, so each storefront gets a lit pane of its own while
+     * the two buildings keep their distinct colors (the player-accessible
+     * side of each is where the windows sit: Pawn tiles 0-5, Laundromat
+     * 25-31). Same row as the Arcade/Mart window band. */
+    draw_storefront_window(13, 0);
+    draw_storefront_window(13, 27);
     for (i = 17; i < 24; ++i) {
         set_tile(i, 6, NEON_TILE_DOOR_L);
         set_tile(i, 7, NEON_TILE_DOOR_C);
@@ -127,15 +135,29 @@ static void show_sidestreet_exterior(void)
 
     for (i = 0; i < 8; ++i) set_attribute_block(0, i, 0);
     for (i = 1; i <= 5; ++i) {
+        if (i == 2) continue; /* the sign row -- handled separately below */
         set_attribute_block(i, 0, 1);
         set_attribute_block(i, 1, 1);
         set_attribute_block(i, 2, 1);
         set_attribute_block(i, 3, 0);
         set_attribute_block(i, 4, 0);
-        set_attribute_block(i, 5, 2);
-        set_attribute_block(i, 6, 2);
-        set_attribute_block(i, 7, 2);
+        set_attribute_block(i, 5, 1);
+        set_attribute_block(i, 6, 1);
+        set_attribute_block(i, 7, 1);
     }
+    /* Row-block 2 (tile rows 8-11) is exactly where both signs sit --
+     * column-blocks 0-2 (Pawn Shop's 12-tile plate) and 5-7 (Laundromat's)
+     * get the dedicated black/white sign palette (3) instead of their
+     * building's own brick color. The gap between them (column-blocks 3-4)
+     * stays sky, same as every other row. */
+    set_attribute_block(2, 0, 3);
+    set_attribute_block(2, 1, 3);
+    set_attribute_block(2, 2, 3);
+    set_attribute_block(2, 3, 0);
+    set_attribute_block(2, 4, 0);
+    set_attribute_block(2, 5, 3);
+    set_attribute_block(2, 6, 3);
+    set_attribute_block(2, 7, 3);
     for (i = 0; i < 8; ++i) set_attribute_block(6, i, 0);
     for (i = 0; i < 8; ++i) set_attribute_block(7, i, 0);
     clear_sprites();
@@ -144,12 +166,16 @@ static void show_sidestreet_exterior(void)
     PPU.mask = 0x1E;
 }
 
-/* Unlike the Arcade (see its own show_arcade_message() comment), palette 3
- * is never claimed by this scene's background art, so it's always safe for
- * show_message_box()'s own repaint -- no footprint reasoning needed here. */
+/* Both buildings now share pal1 for their brick (see show_sidestreet_
+ * exterior()'s own comment on why), which leaves pal2 completely unused by
+ * any attribute block in this scene -- dialogue can hijack it with zero
+ * risk of recoloring anything still visible, the same property this scene
+ * used to get from pal3 before the signs claimed that slot. Restored the
+ * instant show_sidestreet_exterior() redraws after dismissal, same as
+ * always. */
 static void show_sidestreet_message(const char *line1, const char *line2, const char *line3)
 {
-    dialogue_set_palette(3);
+    dialogue_set_palette(2);
     show_message_box(line1, line2, line3);
 }
 
@@ -276,7 +302,9 @@ unsigned char run_sidestreet_exterior(void)
                     clear_sprites();
                     draw_traffic_particles(x, taxi_moving_left);
                     draw_crash_tableau(x, taxi_moving_left);
-                    dialogue_set_palette(3);
+                    /* Pal2 -- see show_sidestreet_message()'s comment on
+                     * why dialogue lands here. */
+                    dialogue_set_palette(2);
                     show_traffic_death();
                 }
             }

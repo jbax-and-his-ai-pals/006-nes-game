@@ -3,12 +3,12 @@
 #include "font.h"
 #include "mmc3.h"
 #include "music.h"
+#include "rng.h"
 #include "v2_dialogue.h"
 #include "v2_drink.h"
 #include "v2_game_state.h"
 #include "v2_inventory.h"
 #include "v2_player_actor.h"
-#include "v2_regulars.h"
 #include "v2_runtime.h"
 #include "v2_scene_bar.h"
 #include "v2_scene_ui.h"
@@ -28,6 +28,10 @@
 #define BAR_TILE_PLANK_R 239
 #define BAR_TILE_JUKEBOX_TOP 240
 #define BAR_TILE_JUKEBOX_BOT 241
+#define PLAYER_TILE_BASE 212
+#define BAR_PATRON_BACK_TOP 59
+#define BAR_PATRON_BACK_BOTTOM 60
+#define REGULAR_FACE_TILE 2
 /* Was its own tile (242); byte-for-byte identical to BAR_TILE_PLANK_R, so
  * that slot now holds the casino lobby's blackjack table art instead (see
  * bar_interior.s) and this just reuses PLANK_R -- same pixels either way. */
@@ -116,7 +120,86 @@ static void draw_jimbles(void)
 
 /* Two short, slumped regulars: they only need head-and-shoulder tiles while
  * standing in the crowded corner, so the lower half stays visually buried in
- * the dark floor/puddle rather than consuming another four OAM slots each. */
+ * the dark floor/puddle rather than consuming another four OAM slots each.
+ *
+ * This wander logic used to share a system in v2_regulars.c with Park's and
+ * the Gym's own wandering NPCs, living in the fixed engine so all three
+ * scenes could call it -- that shared copy kept costing fixed-engine budget
+ * every time any of the three grew, so each scene now keeps its own copy
+ * instead. Position/timer state has to be local to run_bar_interior()
+ * rather than file-scope statics: a scene's own PRG pair (see
+ * cfg/nes_mmc3_scene.cfg) has no BSS/RAM region of its own, only
+ * CODE/RODATA, so there's nowhere for a persistent scene-level variable to
+ * live. */
+static void update_regular(unsigned char *x, unsigned char *y, unsigned char *timer,
+                           unsigned char *steps, unsigned char *direction,
+                           unsigned char *facing_up, RngState *rng, unsigned char min_x,
+                           unsigned char max_x, unsigned char min_y, unsigned char max_y)
+{
+    unsigned char roll;
+    if (*timer) --*timer;
+    else if (*steps) {
+        switch (*direction) {
+            case 0: if (*x < max_x) ++*x; else --*x; *facing_up = 0; break;
+            case 1: if (*x > min_x) --*x; else ++*x; *facing_up = 0; break;
+            case 2: if (*y < max_y) ++*y; else --*y; *facing_up = 0; break;
+            default: if (*y > min_y) { --*y; *facing_up = 1; } else { ++*y; *facing_up = 0; } break;
+        }
+        --*steps;
+        *timer = (unsigned char)(2 + (rng_next(rng) & 3));
+    } else {
+        roll = rng_next(rng);
+        *direction = roll & 3;
+        *steps = (unsigned char)(2 + ((roll >> 2) & 3));
+        *timer = (unsigned char)(45 + (rng_next(rng) & 0x7F));
+    }
+}
+
+/* direction 0/1 (right/left) draws the player's own narrow 2-tile
+ * side-profile art (PLAYER_TILE_BASE+6/+7, see v2_player_actor.c) mirrored
+ * via the OAM flip bit, instead of just flipping the wide front-facing
+ * pose left-right -- a true side view instead of a subtle, easy-to-miss
+ * mirror of a pose that doesn't obviously face either direction to begin
+ * with. direction 2 (down) keeps the wide 4-tile front view and its face
+ * overlay; the side profile has no room for one. */
+static void draw_regular(unsigned char slot, unsigned char face_slot, unsigned char x,
+                         unsigned char y, unsigned char facing_up, unsigned char direction)
+{
+    if (facing_up) {
+        set_oam_sprite(slot, x, y, BAR_PATRON_BACK_TOP, 1);
+        set_oam_sprite(slot + 1, (unsigned char)(x + 8), y, BAR_PATRON_BACK_TOP, 0x41);
+        set_oam_sprite(slot + 2, x, (unsigned char)(y + 8), BAR_PATRON_BACK_BOTTOM, 1);
+        set_oam_sprite(slot + 3, (unsigned char)(x + 8), (unsigned char)(y + 8), BAR_PATRON_BACK_BOTTOM, 0x41);
+        hide_oam_sprite(face_slot); hide_oam_sprite(face_slot + 1);
+    } else if (direction == 0 || direction == 1) {
+        unsigned char side_attr = direction == 1 ? 0x41 : 1;
+
+        set_oam_sprite(slot, (unsigned char)(x + 4), y, PLAYER_TILE_BASE + 6, side_attr);
+        hide_oam_sprite(slot + 1);
+        set_oam_sprite(slot + 2, (unsigned char)(x + 4), (unsigned char)(y + 8), PLAYER_TILE_BASE + 7, side_attr);
+        hide_oam_sprite(slot + 3);
+        hide_oam_sprite(face_slot); hide_oam_sprite(face_slot + 1);
+    } else {
+        set_oam_sprite(slot, x, y, PLAYER_TILE_BASE, 1);
+        set_oam_sprite(slot + 1, (unsigned char)(x + 8), y, PLAYER_TILE_BASE + 1, 1);
+        set_oam_sprite(slot + 2, x, (unsigned char)(y + 8), PLAYER_TILE_BASE + 2, 1);
+        set_oam_sprite(slot + 3, (unsigned char)(x + 8), (unsigned char)(y + 8), PLAYER_TILE_BASE + 3, 1);
+        set_oam_sprite(face_slot, x, y, REGULAR_FACE_TILE, 3);
+        set_oam_sprite(face_slot + 1, (unsigned char)(x + 8), y, REGULAR_FACE_TILE, 0x43);
+    }
+}
+
+/* The bar patron a couple seats down from Jimbles is purely decorative and
+ * never moves, so unlike the two Piss Corner regulars it needs no wander
+ * state at all -- just a fixed 4-sprite draw. */
+static void draw_bar_patron(void)
+{
+    set_oam_sprite(38, 80, 72, BAR_PATRON_BACK_TOP, 1);
+    set_oam_sprite(39, 88, 72, BAR_PATRON_BACK_TOP, 0x41);
+    set_oam_sprite(40, 80, 80, BAR_PATRON_BACK_BOTTOM, 1);
+    set_oam_sprite(41, 88, 80, BAR_PATRON_BACK_BOTTOM, 0x41);
+}
+
 /* The jukebox token is a reward from winning Jimbles's chugging challenge
  * (see the Jimbles block in run_bar_interior()), not a floor pickup, so
  * there is no token sprite to draw or position. */
@@ -250,10 +333,13 @@ static void show_bar_interior(void)
     clear_sprites();
     draw_jimbles();
     draw_bar_patron();
-    draw_regulars();
-    /* Flush the freshly-cleared-plus-Jimbles buffer to the real PPU OAM
-     * before rendering resumes -- see show_neon_avenue()'s comment on the
-     * same call for why clear_sprites() alone isn't enough. */
+    /* The two Piss Corner regulars are NOT drawn here -- their position is
+     * local to run_bar_interior() now (see the comment above
+     * update_regular()), not reachable from this function. The main loop's
+     * own unconditional per-frame draw call (right after any call back to
+     * this function) redraws them before the next vblank flush, so there's
+     * no visible gap -- see show_neon_avenue()'s comment on the same
+     * oam_flush() for why clear_sprites() alone isn't enough regardless. */
     oam_flush();
     reset_scroll();
     PPU.mask = 0x1E;
@@ -644,9 +730,18 @@ unsigned char run_bar_interior(unsigned char arrival)
     unsigned char jimbles_anim_timer = 90;
     unsigned char jimbles_sliding = 0;
     unsigned char jimbles_target = 128;
+    /* Piss Corner's two regulars -- see update_regular()'s comment above
+     * for why this state lives here instead of a shared module. */
+    unsigned char one_x = 200, one_y = 168;
+    unsigned char two_x = 224, two_y = 184;
+    unsigned char one_timer = 74, two_timer = 141;
+    unsigned char one_steps = 0, two_steps = 0;
+    unsigned char one_direction = 0, two_direction = 0;
+    unsigned char one_facing_up = 0, two_facing_up = 0;
+    RngState regular_rng;
 
     music_select_song(MUSIC_SONG_BAR);
-    reset_piss_corner_regulars();
+    rng_seed(&regular_rng, random_seed());
     show_bar_interior();
     for (;;) {
         waitvsync();
@@ -671,9 +766,13 @@ unsigned char run_bar_interior(unsigned char arrival)
             jimbles_target = (jimbles_x <= 116) ? 128 : 104;
         }
         draw_jimbles();
-        update_piss_corner_regulars();
+        update_regular(&one_x, &one_y, &one_timer, &one_steps, &one_direction,
+                       &one_facing_up, &regular_rng, 200, 216, 168, 184);
+        update_regular(&two_x, &two_y, &two_timer, &two_steps, &two_direction,
+                       &two_facing_up, &regular_rng, 224, 232, 176, 192);
         draw_bar_patron();
-        draw_regulars();
+        draw_regular(30, 20, one_x, one_y, one_facing_up, one_direction);
+        draw_regular(34, 22, two_x, two_y, two_facing_up, two_direction);
 
         pad = read_pad();
         if (pad & PAD_UP) facing = PLAYER_FACING_UP;
