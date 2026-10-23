@@ -1,0 +1,25 @@
+# Normalize text to LF in the repo; keep batch files CRLF on every checkout
+# so cmd.exe labels and goto work even when cloned on macOS/Linux.
+* text=auto
+*.bat text eol=crlf
+
+# Binary assets
+*.png binary
+*.bin binary
+*.nes binary
+*.fms binary
+*.mid binary
+*.zip binary
+# Despite the extension, this is a text placeholder; keep it out of the binary rule.
+assets/banks/casino_scene_data.bin text
+
+# ca65 sources are 6502 assembly
+*.s linguist-language=Assembly
+
+# Generated from tools/ -- collapse in diffs, exclude from language stats
+src/font.s linguist-generated
+src/music_songs.s linguist-generated
+src/title_messages.s linguist-generated
+src/title_portrait.s linguist-generated
+src/dumb_comments_data.h linguist-generated
+music/title.s linguist-generated

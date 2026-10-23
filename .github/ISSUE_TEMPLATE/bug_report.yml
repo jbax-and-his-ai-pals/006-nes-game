@@ -1,0 +1,55 @@
+name: Bug report
+description: Something looks, sounds, or plays wrong in the ROM.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to get there
+      description: The route from the title screen, e.g. "Avenue → Mart → back to Avenue → manhole".
+    validations:
+      required: true
+  - type: dropdown
+    id: location
+    attributes:
+      label: Where
+      options:
+        - Title screen
+        - Neon Avenue
+        - Jimbles's Bar
+        - Wrecked 'Em Casino
+        - The Commentarium
+        - All-Nite Mart
+        - Pawn Shop / Laundromat side street
+        - Galaxy Lanes & Arcade
+        - Municipal Gym
+        - Moonlight Park
+        - Sewer
+        - Pocket Zoo
+        - Inventory or dialogue (anywhere)
+    validations:
+      required: true
+  - type: input
+    id: emulator
+    attributes:
+      label: Emulator or hardware
+      placeholder: Mesen 2.1, FCEUX 2.6, Everdrive N8 Pro...
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: The commit you built from (`git rev-parse --short HEAD`).
+  - type: textarea
+    id: media
+    attributes:
+      label: Screenshot or save state
+      description: Drag images or files here. A screenshot helps a lot with graphics bugs.
